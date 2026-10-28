@@ -1,0 +1,4 @@
+# Python venv: machine-local, rebuilt from requirements.txt by 01-setup-env.ps1.
+.venv/
+__pycache__/
+*.py[cod]

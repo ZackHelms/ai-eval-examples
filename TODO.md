@@ -16,27 +16,25 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Now
 
-- **Env prerequisites script** — `01-setup-env.ps1` (repo root, pwsh):
-  idempotently creates/validates the repo venv on the pinned Python,
-  installs Playwright + its browsers (and Locust / locust-plugins once
-  decided), verifies imports and prints versions; adds `.venv/` and capture
-  artifacts to `.gitignore`. Host already has Python 3.12.1 + pwsh 7.6.9.
-  *Blocked on:* first-eval level-set (Needs Zack).
 - **Eval 01 — basic 1-user Python + Playwright debug & fix** — record+codegen
   a short script against a public site (e.g.
   https://playwright.dev/python/docs/intro), break it realistically, capture
   the 1 user × 1 iteration results + trace into `inputs/`, write
   `prompt.md` and `grading/`. Worked on together with the CD; establishes
-  the per-eval file contract. *Blocked on:* level-set, env script.
+  the per-eval file contract. Env is ready (`01-setup-env.ps1`).
+  *Blocked on:* level-set.
 
 <!-- --- -->
 
 ## Needs Zack
 
 - **First-eval level-set** (a working session together, not a solo
-  decision): (a) Python version for the repo venv — leaning 3.12;
+  decision): (a) Python version for the repo venv — 3.12 in use by
+  `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
+  `requirements.txt`); confirm in the ADR;
   (b) multi-user approach — locust + locust-plugins (used at work) vs. an
-  alternative (e.g. asyncio driving N Playwright browser contexts);
+  alternative (e.g. asyncio driving N Playwright browser contexts); the
+  choice lands in `requirements.txt`;
   (c) target policy — which public site(s) are fine for 1-user
   record/codegen, and what local target hosts multi-user runs;
   (d) record+codegen vs. hand-written scripts; (e) per-eval file contract
