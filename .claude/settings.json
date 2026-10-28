@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "zmhstudio": {
+      "source": {
+        "source": "github",
+        "repo": "ZackHelms/zmhstudio"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "zmh-producer@zmhstudio": true
+  }
+}
