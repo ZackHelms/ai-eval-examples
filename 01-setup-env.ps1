@@ -1,4 +1,5 @@
 #Requires -Version 7.0
+
 <#
 .SYNOPSIS
     Ensure this repo's Python venv exists, has every prerequisite for the
@@ -27,12 +28,40 @@
 
 .PARAMETER Force
     Reinstall requirements.txt even if it hasn't changed.
+
+.PARAMETER Help
+    Print this usage and exit. Also: -h, --help, or pwsh's native -?.
+
+.PARAMETER UnknownArgs
+    Not for direct use: collects --help and rejects any unrecognized argument.
+
+.EXAMPLE
+    .\01-setup-env.ps1
+    Set up (or verify) the venv and activate it. Run this at the start of a session.
+
+.EXAMPLE
+    .\01-setup-env.ps1 -Recreate
+    Throw away .venv\ and rebuild it from requirements.txt.
 #>
 [CmdletBinding()]
 param(
     [switch]$Recreate,
-    [switch]$Force
+    [switch]$Force,
+    [Alias('h')]
+    [switch]$Help,
+    [Parameter(ValueFromRemainingArguments, DontShow)]
+    [string[]]$UnknownArgs
 )
+
+# Interactive pwsh passes `--help` through as a plain string rather than a
+# parameter name, so it arrives in $UnknownArgs; anything else there is a typo.
+if ($Help -or $UnknownArgs -contains '--help') {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
+if ($UnknownArgs) {
+    throw "Unknown argument(s): $UnknownArgs. Run .\$(Split-Path -Leaf $PSCommandPath) -h for usage."
+}
 
 # The work runs in a child scope so StrictMode, $ErrorActionPreference and the
 # helper variables don't leak into your session when this file is dot-sourced.

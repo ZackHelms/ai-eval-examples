@@ -15,9 +15,28 @@ Python/Playwright(/Locust) fixtures, pwsh repo scripts.
   catch-alls) without a comment justifying the one safe boundary.
 - Prefer pure functions in tooling; return new values rather than mutate
   inputs.
+
+## Scripts
+
 - pwsh scripts: `Set-StrictMode -Version Latest` and
   `$ErrorActionPreference = 'Stop'` at the top; check native exit codes
-  (`$LASTEXITCODE`) explicitly.
+  (`$LASTEXITCODE`) explicitly. A script meant to be dot-sourced runs its
+  body in `& { … }` so those settings don't leak into the caller's session.
+- **Usage (CLAUDE.md § Script SOP):** `-h` and `--help` print usage from
+  the script's own help text; unknown arguments fail, naming the argument
+  and pointing at `-h`.
+  - **pwsh:** comment-based help (`.SYNOPSIS`, `.DESCRIPTION`, one
+    `.PARAMETER` per parameter, `.EXAMPLE`s) +
+    `[Alias('h')][switch]$Help` + a
+    `[Parameter(ValueFromRemainingArguments, DontShow)][string[]]$UnknownArgs`
+    catch-all, because interactive pwsh passes `--help` as a plain string,
+    not a parameter name. On `$Help -or $UnknownArgs -contains '--help'`,
+    run `Get-Help $PSCommandPath -Detailed` and `return`; on any other
+    `$UnknownArgs`, `throw`. Keep a blank line between `#Requires` and the
+    `<# … #>` help block: a comment touching the block hides it from
+    `Get-Help`. Reference: `01-setup-env.ps1`.
+  - **Python:** `argparse` (it provides `-h`/`--help` and rejects unknown
+    arguments by default); put the usage text in `description`/`help=`.
 
 ## Platform pins (the static reviewer flags these)
 

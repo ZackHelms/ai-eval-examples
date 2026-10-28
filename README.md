@@ -32,6 +32,7 @@ Re-run it at the start of a session or after pulling a change to
 
 Options:
 
+- `-h` or `--help` prints the full usage.
 - `-Recreate` rebuilds the venv from scratch.
 - `-Force` reinstalls the packages.
 - `deactivate` (a command, not an option) leaves the venv.

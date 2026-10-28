@@ -191,3 +191,10 @@ level-set>`.
 - **In-progress SOP:** yes — at most **one** `TODO.md` `## In progress`
   entry, opened before a multi-commit task begins and closed in its last
   commit.
+- **Script SOP:** every script this repo creates prints its usage for
+  `-h` and `--help` (pwsh scripts also keep the native `-?` / `Get-Help`),
+  generated from the script's own help text so usage can't drift from the
+  code, and rejects unknown arguments with a pointer to `-h`. Pattern per
+  language: `.claude/standards/coding.md` § Scripts; reference
+  implementation: `01-setup-env.ps1`. Verbatim plugin seeds (e.g.
+  `.claude/scripts/oversee-ledger-summary.mjs`) follow upstream instead.
