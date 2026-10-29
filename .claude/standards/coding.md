@@ -42,8 +42,18 @@ Python/Playwright(/Locust) fixtures, pwsh repo scripts.
 
 - No multi-user/load runs against third-party public sites — anything
   above 1 user × 1 iteration targets localhost (CLAUDE.md § Project pins).
-- `<FILL-IN: Playwright/Locust API pins — e.g. sync vs async API, locust-
-  plugins user class, browser channel; one bullet per pin, quotable
+- **Waits are locator assertions.** Wait for page state with web-first
+  `expect(locator)` assertions (`to_be_visible()`, `to_have_text()`, …),
+  which retry until the condition holds. Never wait with fixed sleeps
+  (`time.sleep`, `page.wait_for_timeout`), inflated timeouts, or
+  `force=True`.
+- **Transaction timers end on a locator assertion.** A transaction's timer
+  stops only after a locator assertion proves the page reached the expected
+  state. The next transaction starts with a plain action (e.g. `click()`)
+  under a short timeout, because the previous assertion already proved its
+  target ready.
+- `<FILL-IN: remaining Playwright/Locust API pins — e.g. sync vs async API,
+  locust-plugins user class, browser channel; one bullet per pin, quotable
   verbatim by the static reviewer.>`
 
 ## Eval hygiene

@@ -1,0 +1,748 @@
+Traceback (most recent call last):
+  File "D:\gitrepos\ai-eval-examples\evals\01-playwright-python-basic\inputs\script.py", line 35, in <module>
+    asyncio.run(main())
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 684, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "D:\gitrepos\ai-eval-examples\evals\01-playwright-python-basic\inputs\script.py", line 32, in main
+    await run(playwright)
+  File "D:\gitrepos\ai-eval-examples\evals\01-playwright-python-basic\inputs\script.py", line 18, in run
+    await expect(page.get_by_role("link", name="Next Other locators >")).to_be_visible()
+  File "D:\gitrepos\ai-eval-examples\.venv\Lib\site-packages\playwright\async_api\_generated.py", line 14711, in to_be_visible
+    await self._impl_obj.to_be_visible(
+  File "D:\gitrepos\ai-eval-examples\.venv\Lib\site-packages\playwright\_impl\_assertions.py", line 852, in to_be_visible
+    await self._expect_impl(
+  File "D:\gitrepos\ai-eval-examples\.venv\Lib\site-packages\playwright\_impl\_assertions.py", line 128, in _expect_impl
+    _record_soft_or_raise(
+  File "D:\gitrepos\ai-eval-examples\.venv\Lib\site-packages\playwright\_impl\_assertions.py", line 60, in _record_soft_or_raise
+    raise error
+AssertionError: Locator expected to be visible
+Actual value: None
+Error: element(s) not found 
+Call log:
+  - Expect "to_be_visible" get_by_role("link", name="Next Other locators >") with timeout 5000ms
+  - waiting for get_by_role("link", name="Next Other locators >")
+
+Aria snapshot:
+- region "Skip to main content":
+  - link "Skip to main content":
+    - /url: "#__docusaurus_skipToContent_fallback"
+- navigation "Main":
+  - link "Playwright logo Playwright for Python":
+    - /url: /python/
+    - img "Playwright logo"
+    - text: Playwright for Python
+  - link "Docs":
+    - /url: /python/docs/intro
+  - link "API":
+    - /url: /python/docs/api/class-playwright
+  - button "Python"
+  - link "Community":
+    - /url: /python/community/welcome
+  - link "GitHub repository":
+    - /url: https://github.com/microsoft/playwright-python
+  - link "Discord server":
+    - /url: https://aka.ms/playwright/discord
+  - button "Switch between dark and light mode (currently system mode)"
+  - button "Search (Control+k)": Search Ctrl K
+- complementary:
+  - navigation "Docs sidebar":
+    - list:
+      - listitem:
+        - button "Getting Started" [expanded]
+        - list:
+          - listitem:
+            - link "Installation":
+              - /url: /python/docs/intro
+          - listitem:
+            - link "Writing tests":
+              - /url: /python/docs/writing-tests
+          - listitem:
+            - link "Generating tests":
+              - /url: /python/docs/codegen-intro
+          - listitem:
+            - link "Running and debugging tests":
+              - /url: /python/docs/running-tests
+          - listitem:
+            - link "Trace viewer":
+              - /url: /python/docs/trace-viewer-intro
+          - listitem:
+            - link "Setting up CI":
+              - /url: /python/docs/ci-intro
+          - listitem:
+            - link "Pytest Plugin Reference":
+              - /url: /python/docs/test-runners
+      - listitem:
+        - link "Getting started - Library":
+          - /url: /python/docs/library
+      - listitem:
+        - link "Release notes":
+          - /url: /python/docs/release-notes
+      - listitem:
+        - button "Guides" [expanded]
+        - list:
+          - listitem:
+            - link "Actions":
+              - /url: /python/docs/input
+          - listitem:
+            - link "Auto-waiting":
+              - /url: /python/docs/actionability
+          - listitem:
+            - link "API testing":
+              - /url: /python/docs/api-testing
+          - listitem:
+            - link "Assertions":
+              - /url: /python/docs/test-assertions
+          - listitem:
+            - link "Authentication":
+              - /url: /python/docs/auth
+          - listitem:
+            - link "Browsers":
+              - /url: /python/docs/browsers
+          - listitem:
+            - link "Chrome extensions":
+              - /url: /python/docs/chrome-extensions
+          - listitem:
+            - link "Clock":
+              - /url: /python/docs/clock
+          - listitem:
+            - link "Debugging Tests":
+              - /url: /python/docs/debug
+          - listitem:
+            - link "Dialogs":
+              - /url: /python/docs/dialogs
+          - listitem:
+            - link "Downloads":
+              - /url: /python/docs/downloads
+          - listitem:
+            - link "Emulation":
+              - /url: /python/docs/emulation
+          - listitem:
+            - link "Evaluating JavaScript":
+              - /url: /python/docs/evaluating
+          - listitem:
+            - link "Events":
+              - /url: /python/docs/events
+          - listitem:
+            - link "Extensibility":
+              - /url: /python/docs/extensibility
+          - listitem:
+            - link "Frames":
+              - /url: /python/docs/frames
+          - listitem:
+            - link "Handles":
+              - /url: /python/docs/handles
+          - listitem:
+            - link "Isolation":
+              - /url: /python/docs/browser-contexts
+          - listitem:
+            - link "Locators":
+              - /url: /python/docs/locators
+          - listitem:
+            - link "Mock APIs":
+              - /url: /python/docs/mock
+          - listitem:
+            - link "Navigations":
+              - /url: /python/docs/navigations
+          - listitem:
+            - link "Network":
+              - /url: /python/docs/network
+          - listitem:
+            - link "Other locators":
+              - /url: /python/docs/other-locators
+          - listitem:
+            - link "Pages":
+              - /url: /python/docs/pages
+          - listitem:
+            - link "Page object models":
+              - /url: /python/docs/pom
+          - listitem:
+            - link "Screenshots":
+              - /url: /python/docs/screenshots
+          - listitem:
+            - link "Snapshot testing":
+              - /url: /python/docs/aria-snapshots
+          - listitem:
+            - link "Test generator":
+              - /url: /python/docs/codegen
+          - listitem:
+            - link "Touch events (legacy)":
+              - /url: /python/docs/touch-events
+          - listitem:
+            - link "Trace viewer":
+              - /url: /python/docs/trace-viewer
+          - listitem:
+            - link "Videos":
+              - /url: /python/docs/videos
+          - listitem:
+            - link "WebView2":
+              - /url: /python/docs/webview2
+      - listitem:
+        - button "Integrations"
+      - listitem:
+        - link "Supported languages":
+          - /url: /python/docs/languages
+- main:
+  - article:
+    - navigation "Breadcrumbs":
+      - list:
+        - listitem:
+          - link "Home page":
+            - /url: /python/
+            - img
+        - listitem: Guides
+        - listitem: Network
+    - heading "Network" [level=1]
+    - heading "IntroductionDirect link to Introduction" [level=2]:
+      - text: Introduction
+      - link "Direct link to Introduction":
+        - /url: "#introduction"
+        - text: "#"
+    - paragraph:
+      - text: Playwright provides APIs to
+      - strong: monitor
+      - text: and
+      - strong: modify
+      - text: browser network traffic, both HTTP and HTTPS. Any requests that a page does, including
+      - link "XHRs":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
+      - text: and
+      - link "fetch":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
+      - text: requests, can be tracked, modified and handled.
+    - heading "Mock APIsDirect link to Mock APIs" [level=2]:
+      - text: Mock APIs
+      - link "Direct link to Mock APIs":
+        - /url: "#mock-apis"
+        - text: "#"
+    - paragraph:
+      - text: Check out our
+      - link "API mocking guide":
+        - /url: /python/docs/mock
+      - text: to learn more on how to
+    - list:
+      - listitem: mock API requests and never hit the API
+      - listitem: perform the API request and modify the response
+      - listitem: use HAR files to mock network requests.
+    - heading "HTTP AuthenticationDirect link to HTTP Authentication" [level=2]:
+      - text: HTTP Authentication
+      - link "Direct link to HTTP Authentication":
+        - /url: "#http-authentication"
+        - text: "#"
+    - paragraph: Perform HTTP Authentication.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "context = browser.new_context( http_credentials={\"username\": \"bill\", \"password\": \"pa55w0rd\"} ) page = context.new_page() page.goto(\"https://example.com\")"
+      - button "Copy code to clipboard"
+    - heading "HTTP ProxyDirect link to HTTP Proxy" [level=2]:
+      - text: HTTP Proxy
+      - link "Direct link to HTTP Proxy":
+        - /url: "#http-proxy"
+        - text: "#"
+    - paragraph: You can configure pages to load over the HTTP(S) proxy or SOCKSv5. Proxy can be either set globally for the entire browser, or for each browser context individually.
+    - paragraph:
+      - text: You can optionally specify username and password for HTTP(S) proxy, you can also specify hosts to bypass the
+      - link "proxy":
+        - /url: /python/docs/api/class-browser#browser-new-context-option-proxy
+      - text: for.
+    - paragraph: "Here is an example of a global proxy:"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "browser = chromium.launch(proxy={ \"server\": \"http://myproxy.com:3128\", \"username\": \"usr\", \"password\": \"pwd\" })"
+      - button "Copy code to clipboard"
+    - paragraph: "Its also possible to specify it per context:"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "browser = chromium.launch() context = browser.new_context(proxy={\"server\": \"http://myproxy.com:3128\"})"
+      - button "Copy code to clipboard"
+    - heading "Network eventsDirect link to Network events" [level=2]:
+      - text: Network events
+      - link "Direct link to Network events":
+        - /url: "#network-events"
+        - text: "#"
+    - paragraph:
+      - text: You can monitor all the
+      - link "Request":
+        - /url: /python/docs/api/class-request
+      - text: s and
+      - link "Response":
+        - /url: /python/docs/api/class-response
+      - text: "s:"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "from playwright.sync_api import sync_playwright, Playwright def run(playwright: Playwright): chromium = playwright.chromium browser = chromium.launch() page = browser.new_page() # Subscribe to \"request\" and \"response\" events. page.on(\"request\", lambda request: print(\">>\", request.method, request.url)) page.on(\"response\", lambda response: print(\"<<\", response.status, response.url)) page.goto(\"https://example.com\") browser.close() with sync_playwright() as playwright: run(playwright)"
+      - button "Toggle word wrap"
+      - button "Copy code to clipboard"
+    - paragraph:
+      - text: Or wait for a network response after the button click with
+      - link "page.expect_response()":
+        - /url: /python/docs/api/class-page#page-wait-for-response
+      - text: ":"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Use a glob url pattern with page.expect_response(\"**/api/fetch_data\") as response_info: page.get_by_text(\"Update\").click() response = response_info.value"
+      - button "Copy code to clipboard"
+    - heading "VariationsDirect link to Variations" [level=4]:
+      - text: Variations
+      - link "Direct link to Variations":
+        - /url: "#variations"
+        - text: "#"
+    - paragraph:
+      - text: Wait for
+      - link "Response":
+        - /url: /python/docs/api/class-response
+      - text: s with
+      - link "page.expect_response()":
+        - /url: /python/docs/api/class-page#page-wait-for-response
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Use a regular expression with page.expect_response(re.compile(r\"\\.jpeg$\")) as response_info: page.get_by_text(\"Update\").click() response = response_info.value # Use a predicate taking a response object with page.expect_response(lambda response: token in response.url) as response_info: page.get_by_text(\"Update\").click() response = response_info.value"
+      - button "Toggle word wrap"
+      - button "Copy code to clipboard"
+    - heading "Handle requestsDirect link to Handle requests" [level=2]:
+      - text: Handle requests
+      - link "Direct link to Handle requests":
+        - /url: "#handle-requests"
+        - text: "#"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "page.route( \"**/api/fetch_data\", lambda route: route.fulfill(status=200, body=test_data)) page.goto(\"https://example.com\")"
+      - button "Copy code to clipboard"
+    - paragraph: You can mock API endpoints via handling the network requests in your Playwright script.
+    - heading "VariationsDirect link to Variations" [level=4]:
+      - text: Variations
+      - link "Direct link to Variations":
+        - /url: "#variations-1"
+        - text: "#"
+    - paragraph:
+      - text: Set up route on the entire browser context with
+      - link "browser_context.route()":
+        - /url: /python/docs/api/class-browsercontext#browser-context-route
+      - text: or page with
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: . It will apply to popup windows and opened links.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "context.route( \"**/api/login\", lambda route: route.fulfill(status=200, body=\"accept\")) page.goto(\"https://example.com\")"
+      - button "Copy code to clipboard"
+    - heading "Modify requestsDirect link to Modify requests" [level=2]:
+      - text: Modify requests
+      - link "Direct link to Modify requests":
+        - /url: "#modify-requests"
+        - text: "#"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Delete header def handle_route(route): headers = route.request.headers del headers[\"x-secret\"] route.continue_(headers=headers) page.route(\"**/*\", handle_route) # Continue requests as POST. page.route(\"**/*\", lambda route: route.continue_(method=\"POST\"))"
+      - button "Copy code to clipboard"
+    - paragraph: You can continue requests with modifications. Example above removes an HTTP header from the outgoing requests.
+    - heading "Abort requestsDirect link to Abort requests" [level=2]:
+      - text: Abort requests
+      - link "Direct link to Abort requests":
+        - /url: "#abort-requests"
+        - text: "#"
+    - paragraph:
+      - text: You can abort requests using
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: and
+      - link "route.abort()":
+        - /url: /python/docs/api/class-route#route-abort
+      - text: .
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "page.route(\"**/*.{png,jpg,jpeg}\", lambda route: route.abort()) # Abort based on the request type page.route(\"**/*\", lambda route: route.abort() if route.request.resource_type == \"image\" else route.continue_())"
+      - button "Toggle word wrap"
+      - button "Copy code to clipboard"
+    - heading "Modify responsesDirect link to Modify responses" [level=2]:
+      - text: Modify responses
+      - link "Direct link to Modify responses":
+        - /url: "#modify-responses"
+        - text: "#"
+    - paragraph:
+      - text: To modify a response use
+      - link "APIRequestContext":
+        - /url: /python/docs/api/class-apirequestcontext
+      - text: to get the original response and then pass the response to
+      - link "route.fulfill()":
+        - /url: /python/docs/api/class-route#route-fulfill
+      - text: ". You can override individual fields on the response via options:"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "def handle_route(route: Route) -> None: # Fetch original response. response = route.fetch() # Add a prefix to the title. body = response.text() body = body.replace(\"<title>\", \"<title>My prefix:\") route.fulfill( # Pass all fields from the response. response=response, # Override response body. body=body, # Force content type to be html. headers={**response.headers, \"content-type\": \"text/html\"}, ) page.route(\"**/title.html\", handle_route)"
+      - button "Copy code to clipboard"
+    - heading "How request interception worksDirect link to How request interception works" [level=2]:
+      - text: How request interception works
+      - link "Direct link to How request interception works":
+        - /url: "#how-request-interception-works"
+        - text: "#"
+    - paragraph:
+      - text: "Routes sit between the page and the browser's network stack. The handler runs before the network stack has processed the request:"
+      - link "route.continue_()":
+        - /url: /python/docs/api/class-route#route-continue
+      - text: passes it on,
+      - link "route.fulfill()":
+        - /url: /python/docs/api/class-route#route-fulfill
+      - text: answers it without touching the network, and
+      - link "route.abort()":
+        - /url: /python/docs/api/class-route#route-abort
+      - text: fails it.
+    - document: Server Network stack Playwright Page Server Network stack Playwright Page route handler runs adds Cookie, Host, Sec-Fetch-*, ... stores cookies request route.continue() request response response headers as sent by the server response
+    - heading "Headers owned by the network stackDirect link to Headers owned by the network stack" [level=3]:
+      - text: Headers owned by the network stack
+      - link "Direct link to Headers owned by the network stack":
+        - /url: "#headers-owned-by-the-network-stack"
+        - text: "#"
+    - paragraph:
+      - text: "Some headers are attached by the network stack right before the request is sent:"
+      - code: Cookie
+      - text: ","
+      - code: Host
+      - text: ","
+      - code: Accept-Encoding
+      - text: ","
+      - code: Content-Length
+      - text: ","
+      - code: Sec-Fetch-*
+      - text: "and a few others. This is a security boundary: an"
+      - code: HttpOnly
+      - text: cookie, for example, is never exposed to the page. Since the route handler runs before that step, these headers are not reliably present in
+      - link "request.headers":
+        - /url: /python/docs/api/class-request#request-headers
+      - text: or
+      - link "request.all_headers()":
+        - /url: /python/docs/api/class-request#request-all-headers
+      - text: ", and they cannot be overridden. A"
+      - code: cookie
+      - text: header passed to
+      - link "route.continue_()":
+        - /url: /python/docs/api/class-route#route-continue
+      - text: is ignored in favor of the browser's cookie store.
+    - paragraph:
+      - text: On the response side the network stack has already done its work, so
+      - link "response.all_headers()":
+        - /url: /python/docs/api/class-response#response-all-headers
+      - text: returns the headers exactly as the server sent them, including
+      - code: Set-Cookie
+      - text: for
+      - code: HttpOnly
+      - text: "cookies. To see the exact request headers that went over the wire, observe the request without routing it: with no routes installed,"
+      - link "request.all_headers()":
+        - /url: /python/docs/api/class-request#request-all-headers
+      - text: includes all of them.
+    - heading "RedirectsDirect link to Redirects" [level=3]:
+      - text: Redirects
+      - link "Direct link to Redirects":
+        - /url: "#redirects"
+        - text: "#"
+    - paragraph:
+      - text: Playwright treats a request and its redirects as a single unit. The handler is called once, for the original request, and the browser follows the redirect on its own.
+      - link "response.request":
+        - /url: /python/docs/api/class-response#response-request
+      - text: returns the last request in the chain, and
+      - link "request.redirected_from":
+        - /url: /python/docs/api/class-request#request-redirected-from
+      - text: walks it back to the one you intercepted. Headers passed to
+      - link "route.continue_()":
+        - /url: /python/docs/api/class-route#route-continue
+      - text: apply to every hop of the chain, except
+      - code: cookie
+      - text: ", which always comes from the cookie store."
+    - paragraph:
+      - text: Fulfilling with a
+      - code: 3xx
+      - text: status does not give you a second chance to intercept. Chromium and Firefox follow the redirect without calling your handler, and WebKit rejects the call. To serve different content, fulfill with that content. To send the request elsewhere, pass
+      - code: url
+      - text: to
+      - link "route.continue_()":
+        - /url: /python/docs/api/class-route#route-continue
+      - text: or
+      - link "route.fallback()":
+        - /url: /python/docs/api/class-route#route-fallback
+      - text: .
+    - heading "Glob URL patternsDirect link to Glob URL patterns" [level=2]:
+      - text: Glob URL patterns
+      - link "Direct link to Glob URL patterns":
+        - /url: "#glob-url-patterns"
+        - text: "#"
+    - paragraph:
+      - text: Playwright uses simplified glob patterns for URL matching in network interception methods like
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: or
+      - link "page.expect_response()":
+        - /url: /python/docs/api/class-page#page-wait-for-response
+      - text: ". These patterns support basic wildcards:"
+    - list:
+      - listitem:
+        - text: "Asterisks:"
+        - list:
+          - listitem:
+            - text: A single
+            - code: "*"
+            - text: matches any characters except
+            - code: /
+          - listitem:
+            - text: A double
+            - code: "**"
+            - text: matches any characters including
+            - code: /
+      - listitem:
+        - text: Question mark
+        - code: "?"
+        - text: matches only question mark
+        - code: "?"
+        - text: . If you want to match any character, use
+        - code: "*"
+        - text: instead.
+      - listitem:
+        - text: Curly braces
+        - code: "{}"
+        - text: can be used to match a list of options separated by commas
+        - code: ","
+      - listitem:
+        - text: Backslash
+        - code: \
+        - text: can be used to escape any of special characters (note to escape backslash itself as
+        - code: \\
+        - text: )
+    - paragraph: "Examples:"
+    - list:
+      - listitem:
+        - code: https://example.com/*.js
+        - text: matches
+        - code: https://example.com/file.js
+        - text: but not
+        - code: https://example.com/path/file.js
+      - listitem:
+        - code: https://example.com/?page=1
+        - text: matches
+        - code: https://example.com/?page=1
+        - text: but not
+        - code: https://example.com
+      - listitem:
+        - code: "**/*.js"
+        - text: matches both
+        - code: https://example.com/file.js
+        - text: and
+        - code: https://example.com/path/file.js
+      - listitem:
+        - code: "**/*.{png,jpg,jpeg}"
+        - text: matches all image requests
+    - paragraph: "Important notes:"
+    - list:
+      - listitem: The glob pattern must match the entire URL, not just a part of it.
+      - listitem: When using globs for URL matching, consider the full URL structure, including the protocol and path separators.
+      - listitem: For more complex matching requirements, consider using [RegExp] instead of glob patterns.
+    - heading "WebSocketsDirect link to WebSockets" [level=2]:
+      - text: WebSockets
+      - link "Direct link to WebSockets":
+        - /url: "#websockets"
+        - text: "#"
+    - paragraph:
+      - text: Playwright supports
+      - link "WebSockets":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API
+      - text: inspection, mocking and modifying out of the box. See our
+      - link "API mocking guide":
+        - /url: /python/docs/mock#mock-websockets
+      - text: to learn how to mock WebSockets.
+    - paragraph:
+      - text: Every time a WebSocket is created, the
+      - link "page.on(\"websocket\")":
+        - /url: /python/docs/api/class-page#page-event-web-socket
+      - text: event is fired. This event contains the
+      - link "WebSocket":
+        - /url: /python/docs/api/class-websocket
+      - text: "instance for further web socket frames inspection:"
+    - code: "def on_web_socket(ws): print(f\"WebSocket opened: {ws.url}\") ws.on(\"framesent\", lambda payload: print(payload)) ws.on(\"framereceived\", lambda payload: print(payload)) ws.on(\"close\", lambda payload: print(\"WebSocket closed\")) page.on(\"websocket\", on_web_socket)"
+    - button "Copy code to clipboard"
+    - heading "Missing Network Events and Service WorkersDirect link to Missing Network Events and Service Workers" [level=2]:
+      - text: Missing Network Events and Service Workers
+      - link "Direct link to Missing Network Events and Service Workers":
+        - /url: "#missing-network-events-and-service-workers"
+        - text: "#"
+    - paragraph:
+      - text: Playwright's built-in
+      - link "browser_context.route()":
+        - /url: /python/docs/api/class-browsercontext#browser-context-route
+      - text: and
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: allow your tests to natively route requests and perform mocking and interception.
+    - paragraph:
+      - text: If you're using Playwright's native
+      - link "browser_context.route()":
+        - /url: /python/docs/api/class-browsercontext#browser-context-route
+      - text: and
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: ", and it appears network events are missing, disable Service Workers by setting"
+      - link "service_workers":
+        - /url: /python/docs/api/class-browser#browser-new-context-option-service-workers
+      - text: to
+      - code: "'block'"
+      - text: .
+    - paragraph:
+      - text: It might be that you are using a mock tool such as Mock Service Worker (MSW). While this tool works out of the box for mocking responses, it adds its own Service Worker that takes over the network requests, hence making them invisible to
+      - link "browser_context.route()":
+        - /url: /python/docs/api/class-browsercontext#browser-context-route
+      - text: and
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: . If you are interested in both network testing and mocking, consider using built-in
+      - link "browser_context.route()":
+        - /url: /python/docs/api/class-browsercontext#browser-context-route
+      - text: and
+      - link "page.route()":
+        - /url: /python/docs/api/class-page#page-route
+      - text: for
+      - link "response mocking":
+        - /url: "#handle-requests"
+      - text: .
+  - navigation "Docs pages":
+    - link "Previous « Navigations":
+      - /url: /python/docs/navigations
+    - link "Next Other locators »":
+      - /url: /python/docs/other-locators
+  - list:
+    - listitem:
+      - link "Introduction":
+        - /url: "#introduction"
+    - listitem:
+      - link "Mock APIs":
+        - /url: "#mock-apis"
+    - listitem:
+      - link "HTTP Authentication":
+        - /url: "#http-authentication"
+    - listitem:
+      - link "HTTP Proxy":
+        - /url: "#http-proxy"
+    - listitem:
+      - link "Network events":
+        - /url: "#network-events"
+    - listitem:
+      - link "Handle requests":
+        - /url: "#handle-requests"
+    - listitem:
+      - link "Modify requests":
+        - /url: "#modify-requests"
+    - listitem:
+      - link "Abort requests":
+        - /url: "#abort-requests"
+    - listitem:
+      - link "Modify responses":
+        - /url: "#modify-responses"
+    - listitem:
+      - link "How request interception works":
+        - /url: "#how-request-interception-works"
+      - list:
+        - listitem:
+          - link "Headers owned by the network stack":
+            - /url: "#headers-owned-by-the-network-stack"
+        - listitem:
+          - link "Redirects":
+            - /url: "#redirects"
+    - listitem:
+      - link "Glob URL patterns":
+        - /url: "#glob-url-patterns"
+    - listitem:
+      - link "WebSockets":
+        - /url: "#websockets"
+    - listitem:
+      - link "Missing Network Events and Service Workers":
+        - /url: "#missing-network-events-and-service-workers"
+- contentinfo:
+  - text: Learn
+  - list:
+    - listitem:
+      - link "Getting started":
+        - /url: /python/docs/intro
+    - listitem:
+      - link "Playwright Training(opens in new tab)":
+        - /url: https://learn.microsoft.com/en-us/training/modules/build-with-playwright/
+        - text: Playwright Training
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Learn Videos":
+        - /url: /python/community/learn-videos
+    - listitem:
+      - link "Feature Videos":
+        - /url: /python/community/feature-videos
+  - text: Community
+  - list:
+    - listitem:
+      - link "Stack Overflow(opens in new tab)":
+        - /url: https://stackoverflow.com/questions/tagged/playwright
+        - text: Stack Overflow
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Discord(opens in new tab)":
+        - /url: https://aka.ms/playwright/discord
+        - text: Discord
+        - img "(opens in new tab)"
+    - listitem:
+      - link "X(opens in new tab)":
+        - /url: https://x.com/playwrightweb
+        - text: X
+        - img "(opens in new tab)"
+    - listitem:
+      - link "LinkedIn(opens in new tab)":
+        - /url: https://www.linkedin.com/company/playwrightweb
+        - text: LinkedIn
+        - img "(opens in new tab)"
+  - text: More
+  - list:
+    - listitem:
+      - link "GitHub(opens in new tab)":
+        - /url: https://github.com/microsoft/playwright-python
+        - text: GitHub
+        - img "(opens in new tab)"
+    - listitem:
+      - link "YouTube(opens in new tab)":
+        - /url: https://www.youtube.com/channel/UC46Zj8pDH5tDosqm1gd7WTg
+        - text: YouTube
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Blog(opens in new tab)":
+        - /url: https://dev.to/playwright
+        - text: Blog
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Ambassadors":
+        - /url: /python/community/ambassadors
+    - listitem:
+      - link "Microsoft Privacy Statement(opens in new tab)":
+        - /url: https://go.microsoft.com/fwlink/?LinkId=521839
+        - text: Microsoft Privacy Statement
+        - img "(opens in new tab)"
+  - text: Copyright © 2026 Microsoft
+exit code: 1
