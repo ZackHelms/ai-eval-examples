@@ -7,38 +7,28 @@ the grading material it must not see: a reference fix and rubric
 
 ## Setup
 
-Prerequisites:
+- **PowerShell 7+** (`pwsh`)
+  - Not `powershell` 5.1 that ships with Windows
+  - Check version with `$PSVersionTable`
+  - Get `pwsh` with `winget install Microsoft.PowerShell`
+- **Python 3.12.**
+  - On Windows: `winget install Python.Python.3.12`
+- `.\01-setup-env.ps1 --help` to see what it does before running it
+- `.\01-setup-env.ps1`
 
-- **PowerShell 7+** (`pwsh`). This is not the Windows PowerShell 5.1
-  (`powershell`) that ships with Windows; get pwsh with
-  `winget install Microsoft.PowerShell`.
-- **Python 3.12.** On Windows: `winget install Python.Python.3.12`.
 
-From the repo root, in pwsh:
+## Record New Script & Create Eval
+```pwsh
+New-Item -ItemType Directory -Force recordings | Out-Null
+playwright codegen --target python --viewport-size "1280,720" -o recordings\playwright-dev.py https://playwright.dev/python/
 
-```powershell
-.\01-setup-env.ps1        # or dot-source it: . .\01-setup-env.ps1
 ```
 
-The script:
 
-- creates `.venv\` from Python 3.12 (`.venv\` is git-ignored);
-- installs the pinned packages in `requirements.txt`, plus Playwright's Chromium;
-- smoke-tests them;
-- activates the venv in your session, so your prompt gains a `(.venv)` prefix.
 
-Re-run it at the start of a session or after pulling a change to
-`requirements.txt`. When nothing changed it finishes in about 2 seconds.
-
-Options:
-
-- `-h` or `--help` prints the full usage.
-- `-Recreate` rebuilds the venv from scratch.
-- `-Force` reinstalls the packages.
-- `deactivate` (a command, not an option) leaves the venv.
+## Misc
 
 Notes:
-
 - **The venv lives in the repo folder but is never committed.** It contains
   absolute paths and platform-specific binaries, so each machine builds its
   own from `requirements.txt`. To add a package, pin it in
@@ -50,7 +40,6 @@ Notes:
   the repo as a zip instead of cloning it, also run
   `Unblock-File .\01-setup-env.ps1`.
 
-### bash → pwsh cheat sheet
 
 | bash | pwsh |
 |---|---|
@@ -63,3 +52,4 @@ Notes:
 | `echo $?` (exit code) | `$LASTEXITCODE` (`$?` is only a true/false success flag) |
 | `set -e` | `$ErrorActionPreference = 'Stop'` (doesn't cover native-exe exit codes) |
 | `~/.bashrc` | `$PROFILE` |
+

@@ -9,8 +9,10 @@ results, a Playwright trace) and the grading material that judges the answer
 (a reference fix and a rubric).
 
 - **Creative Director (CD):** the human (sets direction, chooses which evals
-  to build, approves phases, trial-runs and judges evals).
-- **Lead Engineer:** the AI (designs, proposes, implements after approval).
+  to build, occasionally creates some eval assets in order to learn, approves
+  phases, trial-runs evals, judges scope and quality of example set coverage).
+- **Lead Engineer:** the AI (facilitates brainstorming, planning, design, 
+  implementation, and refinement of evaluation examples).
 
 Optimize every decision for **clarity, maintainability, deterministic
 workflows, AI collaboration, modularity, and long-term extensibility** — not
