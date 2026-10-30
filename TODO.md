@@ -27,18 +27,29 @@ comes next.*
   one rubric for every debug-and-fix script eval instead of one per
   script: a trial scores 100 if the fixed script passes and 0 if any cheat
   is detected (swallowed errors, sleeps or longer timeouts, removed or
-  weakened checks, …); 10 one-shot trials per model + effort, average =
+  weakened checks, …); N one-shot trials per model + effort, average =
   score. Prompt: "debug & fix; here are the script and its results; do not
   run it". Graders: deterministic scripts first, LLM graders for the
-  subtler cheats. Uses: rate task complexity by issue type; tune context
-  files until a target model scores 100; the eval loop for the CD's
-  pw-script-hardener script-hardening agent at work. Open design points (see the
-  session discussion): what "passes" means beyond exit 0, a third outcome
-  for "not a script bug, escalate", failure tags alongside the binary
-  score, how many trials a claim needs, held-out cases for context tuning,
-  where cases come from (mutations, release fixes in git history).
-  Reshapes § Next: Eval 01 grader, Capture script, Trial runner script,
-  Eval: impossible locator.
+  subtler cheats. Uses: rate task complexity by issue type; tune the
+  context files of a script-hardening agent until it succeeds reliably.
+  Decided (CD, 2026-10-30):
+  - The evals stay one-shot, although the agent itself will fix and re-run
+    up to 10 times before alerting a human: they're a teaching tool and
+    the yardstick for context files.
+  - One visible defect per case: cut the script after the failing
+    transaction (a later defect hides behind the first), then re-capture
+    its evidence.
+  - Cases stay once added, as a regression suite; bar about ≥95% over 100
+    trials.
+  - Tuning context on the suite is the goal, not a risk; new incoming
+    issues are the fresh test.
+  - Seed cases by recreating past issues; add each new issue the agent
+    can't fix.
+  Open: what "passes" means beyond exit 0 (keep the original's
+  transactions, assertions and clickstream); expected outcome per case
+  (fix | escalate); failure tags; trial counts per stage (screen vs. full
+  run); the case template. Reshapes § Next: Eval 01 grader, Capture
+  script, Trial runner script, Eval: impossible locator.
 - **First-eval level-set** (a working session together, not a solo
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
