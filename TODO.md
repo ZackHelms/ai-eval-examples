@@ -11,11 +11,12 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
   CD, to learn the process). Done: codegen recording (async, 1280×720),
   break (`»`/`«` → `>`/`<` in two link names), `prompt.md`,
   `grading/rubric.md`, `grading/reference/script.py`; evidence
-  re-captured UTF-8-safe; trial runs 1–2 (Haiku 4.5) graded in
-  `grading/trials.md`; committed and pushed. Remaining: more trial runs
-  until the rubric settles. The repo stays public (CD, 2026-10-29): answer
-  keys and the local paths in evidence are public, so the rubric's "this
-  repo online" cheating rule matters.
+  re-captured UTF-8-safe; trial runs 1–12 graded in `grading/trials.md`
+  (Haiku 4.5 typically 45, Haiku 5.5 100; runs 3+ headless). Remaining:
+  the CD's trial-policy calls (§ Needs Zack), then decide whether Eval 01
+  is done or gets a harder setup. The repo stays public (CD, 2026-10-29):
+  answer keys and the local paths in evidence are public, so the rubric's
+  "this repo online" cheating rule matters.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -30,6 +31,18 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Needs Zack
 
+- **Eval 01 trial policy** (from trial runs 3–12, `grading/trials.md`):
+  (a) run 10 is an automatic zero for listing the repo's `.venv` (a path
+  from the traceback in `results.txt`) to check Playwright was installed;
+  it would otherwise score 100. Keep the bright line, or exempt checks of
+  the Python environment the evidence names? Recommendation: keep it, and
+  stop the evidence from naming the repo (Capture script, § Next).
+  (b) let trials run the script (`python inputs/script.py`)? Line 20 can
+  only be inferred from the evidence, so running is how a model verifies;
+  Haiku 5.5 tried every time and was denied. Recommendation: allow it as
+  a named variant ("run allowed"), trials one at a time (each a single
+  1-user replay against playwright.dev), and keep the current runs as the
+  "no run" baseline.
 - **First-eval level-set** (a working session together, not a solo
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
@@ -59,12 +72,20 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   anatomy settled).
 - **Eval-integrity gate** — a check script that becomes the hard gate:
   every `prompt.md` placeholder resolves under `inputs/`, nothing in
-  `prompt.md`/`inputs/` references `grading/`, required files exist.
-  *Depends on:* Eval 01 (file contract).
+  `prompt.md`/`inputs/` references `grading/` or names the repo's path,
+  required files exist. *Depends on:* Eval 01 (file contract).
 - **Capture script** — runs an eval's script once (1 user × 1 iteration)
   and writes `results.txt` (UTF-8-safe on any console) + the trace, so
-  fixtures regenerate identically. Prompted by Eval 01's corrupted first
-  capture.
+  fixtures regenerate identically. Run it from a neutral folder outside
+  the repo (with a venv there too), so tracebacks don't name the repo:
+  Eval 01's do, and trial run 10 followed one. Then re-capture Eval 01.
+  Prompted by Eval 01's corrupted first capture.
+- **Trial runner script** — the headless launch in Eval 01's
+  `grading/trials.md` § Setup as a repo script (per Script SOP): copy
+  `prompt.md` + `inputs/` to a trial folder, strip the parent session's
+  `CLAUDE*` variables, put the real `pwsh.exe` first on `PATH`, absolute
+  allow rules, stream-json log. Takes eval, run number, model and effort.
+  The SDK trial harness (§ Later) builds on it.
 - **Eval 01 grader** — (1) a deterministic script: runs a copy of the
   model's fixed script (exit code), diffs it against `inputs/`, flags fake
   fixes (removed `expect`, sleeps, `force=True`, longer timeouts), and
