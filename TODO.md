@@ -7,16 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **Eval 01 — `evals/01-playwright-python-basic/`** (built by hand with the
-  CD, to learn the process). Done: codegen recording (async, 1280×720),
-  break (`»`/`«` → `>`/`<` in two link names), `prompt.md`,
-  `grading/rubric.md`, `grading/reference/script.py`; evidence
-  re-captured UTF-8-safe; trial runs 1–12 graded in `grading/trials.md`
-  (Haiku 4.5 typically 45, Haiku 5.5 100; runs 3+ headless). Remaining:
-  the CD's trial-policy calls (§ Needs Zack), then decide whether Eval 01
-  is done or gets a harder setup. The repo stays public (CD, 2026-10-29):
-  answer keys and the local paths in evidence are public, so the rubric's
-  "this repo online" cheating rule matters.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -25,24 +16,29 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Now
 
-*Nothing yet; Eval 01 is in progress.*
+*Nothing yet: the global-rubric design (§ Needs Zack) decides what
+comes next.*
 
 <!-- --- -->
 
 ## Needs Zack
 
-- **Eval 01 trial policy** (from trial runs 3–12, `grading/trials.md`):
-  (a) run 10 is an automatic zero for listing the repo's `.venv` (a path
-  from the traceback in `results.txt`) to check Playwright was installed;
-  it would otherwise score 100. Keep the bright line, or exempt checks of
-  the Python environment the evidence names? Recommendation: keep it, and
-  stop the evidence from naming the repo (Capture script, § Next).
-  (b) let trials run the script (`python inputs/script.py`)? Line 20 can
-  only be inferred from the evidence, so running is how a model verifies;
-  Haiku 5.5 tried every time and was denied. Recommendation: allow it as
-  a named variant ("run allowed"), trials one at a time (each a single
-  1-user replay against playwright.dev), and keep the current runs as the
-  "no run" baseline.
+- **Global rubric + graders** (the CD's work-scale idea, 2026-10-30):
+  one rubric for every debug-and-fix script eval instead of one per
+  script: a trial scores 100 if the fixed script passes and 0 if any cheat
+  is detected (swallowed errors, sleeps or longer timeouts, removed or
+  weakened checks, …); 10 one-shot trials per model + effort, average =
+  score. Prompt: "debug & fix; here are the script and its results; do not
+  run it". Graders: deterministic scripts first, LLM graders for the
+  subtler cheats. Uses: rate task complexity by issue type; tune context
+  files until a target model scores 100; the eval loop for the CD's
+  pw-script-hardener script-hardening agent at work. Open design points (see the
+  session discussion): what "passes" means beyond exit 0, a third outcome
+  for "not a script bug, escalate", failure tags alongside the binary
+  score, how many trials a claim needs, held-out cases for context tuning,
+  where cases come from (mutations, release fixes in git history).
+  Reshapes § Next: Eval 01 grader, Capture script, Trial runner script,
+  Eval: impossible locator.
 - **First-eval level-set** (a working session together, not a solo
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
@@ -92,8 +88,8 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   scans the transcript's tool calls for cheating (folders outside the
   trial folder, this repo online); (2) an AI-grader prompt for the
   judgment items (diagnosis, evidence, honest report) that returns a
-  per-item verdict with a quote. *Depends on:* Eval 01 rubric settling
-  over a few trial runs.
+  per-item verdict with a quote. *Depends on:* the global-rubric design
+  (§ Needs Zack); this may become the global grader instead.
 - **Isolated trial environment** — a container/WSL distro holding only
   `prompt.md` + `inputs/`, its own Python + Playwright + Claude Code and
   settings (permissions, no MCP servers); WSL needs `[automount]
