@@ -28,6 +28,12 @@ to one eval (e.g. `feat(playwright-basic-debug): add rubric`).
   code**, read **immediately after** the gating command: a pipeline
   reports the *last* command's status, not the gate's — run gates
   unpiped, or capture to a log and test `$LASTEXITCODE` before committing.
+- **Public repo:** before committing, check the staged diff and the
+  message for names that must stay out (CLAUDE.md § Project pins: generic
+  content only). A pushed leak can't be fully unpublished: after a history
+  rewrite, GitHub still serves the old commits by SHA and lists them in the
+  repo's Activity log. Only deleting the repo, or a GitHub Support request,
+  removes them.
 - Never stage with a blanket `add -A`/`add .` — stage named files, and
   review `git status`/`git diff --cached` before committing.
 - Reference an ADR when a commit implements a recorded decision.

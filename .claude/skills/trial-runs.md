@@ -1,0 +1,90 @@
+# Skill: Trial-running an eval (headless Claude Code)
+
+How this repo runs a model on an eval (the Playtest SOP) until
+`20-run-trials.ps1` exists (grader-01 phase D); this file is also that
+script's spec. Learned on Eval 01's runs 1–12 (2026-10-29/30, Claude Code
+2.1.312–2.1.314).
+
+## Launch
+
+Copy `prompt.md` + `inputs/` to `~\eval-trials\<NN>-run<N>\` (outside the
+repo; the folder name carries only the number). With the repo venv active,
+from that folder:
+
+```pwsh
+claude -p "<prompt.md text>" --safe-mode --strict-mcp-config --model <model> `
+  --permission-mode default `
+  --allowedTools "Edit(//c/Users/<you>/eval-trials/<NN>-run<N>/inputs/script.py)" `
+                 "Write(//c/Users/<you>/eval-trials/<NN>-run<N>/inputs/script.py)" `
+  --output-format stream-json --verbose > ~\eval-trials\<NN>-run<N>.stream.jsonl
+```
+
+Add `--effort <level>` for a non-default effort. In headless mode anything
+that needs approval is denied automatically and listed in the result
+line's `permission_denials`. Read-only commands inside the trial folder run
+without approval. So with these rules the model can read and edit, but
+can't run the script or fetch the web: that's the subject's tool profile
+(`edit-only`). Record it with the result.
+
+## Launcher gotchas (each one cost runs)
+
+1. **Use absolute allow rules** (`//c/...`). A relative rule
+   (`Edit(./inputs/script.py)`) stops matching once the model runs
+   `cd inputs`: Eval 01's runs 7 and 9 were denied their edit.
+2. **Strip the parent session's variables** when launching from inside a
+   Claude Code session, or the trial starts as its child: everything
+   `CLAUDE*`, plus `AI_AGENT`, `NO_COLOR`, `PYTHONIOENCODING`,
+   `GIT_ASKPASS`, `GIT_EDITOR`, `GIT_TERMINAL_PROMPT`, `GCM_INTERACTIVE`,
+   `COREPACK_ENABLE_AUTO_PIN`, `PSExecutionPolicyPreference`,
+   `NoDefaultCurrentDirectoryInExePath` and any plugin-injected variables.
+3. **Put the real `pwsh.exe` first on `PATH`:**
+   `$env:PATH = (Split-Path (Get-Process -Id $PID).Path) + ';' + $env:PATH`.
+   Through the WindowsApps app-execution alias, Claude Code's PowerShell
+   tool fails every command with "The command line is too long" (runs
+   7–9). Stripping variables does **not** fix this; only the `PATH` change
+   does.
+4. **Test a changed launcher** with a cheap harness run before spending
+   trials: one PowerShell command, `cd inputs` + one Bash command, one Edit
+   of a dummy file, then check all three results.
+
+## Transcripts
+
+- **stream-json log** (headless): an `init` line (`model`,
+  `claude_code_version`, `session_id`) and a `result` line (`is_error`,
+  `api_error_status`, `permission_denials`, `result` = the final text,
+  `total_cost_usd`).
+- **Session transcript** (every run, including interactive ones):
+  `~\.claude\projects\<mangled>\<session>.jsonl`, where `<mangled>` is the
+  trial folder's absolute path with every non-alphanumeric character
+  replaced by `-` (`C:\Users\zmhel\eval-trials\01-run1` →
+  `C--Users-zmhel-eval-trials-01-run1`). It has no result line; assistant
+  lines carry `message.model`, `version` and `sessionId`.
+- Haiku 4.5 and 5.5 leave their thinking blocks empty: grade on the visible
+  text and the tool calls.
+- **Cost per Eval 01 run:** Haiku 4.5 about $0.08, Haiku 5.5 about $0.01.
+
+## Grading replays
+
+- Replay a copy in `%TEMP%`, never in the repo or the trial folder (the
+  script writes its trace next to itself). Run the reference first as a
+  control: if it fails, the site changed, so don't grade.
+- `python -X utf8 script.py`. `python -I` ignores `PYTHONUTF8`, and a
+  cp1252 console write crashes on `»`.
+- One replay at a time; public sites get single replays only (CLAUDE.md
+  § Project pins).
+- Eval 01's script launches `headless=False`, so browser windows open.
+  Don't change the script to stop them.
+
+## Windows file gotchas
+
+- Python text mode writes CRLF on Windows, but the repo is LF. Write with
+  `newline="\n"` (or repair with `sed -i 's/\r$//'`) and check
+  `git diff --stat` for whole-file diffs.
+- Capture console output as UTF-8 (`python -X utf8`). Redirecting a cp1252
+  write through a cp437 console turned Eval 01's `»`/`«` into `╗`/`½`
+  (`.claude/standards/architecture.md` § Learnings).
+
+## How many trials
+
+`.claude/notes/20261031-trial-statistics.md`: what 10 or 100 trials can
+and can't prove.

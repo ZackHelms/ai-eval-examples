@@ -30,6 +30,11 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Needs Zack
 
+- **AGENT-OPP: eval static reviewer** (refine pass, 2026-10-31): the
+  static pre-pass (CLAUDE.md § Validation, step 1) still has no agent, and
+  this session ran its checks by hand each time (answer leaks in
+  `prompt.md`/`inputs/`, placeholders, LF endings, the generic-content
+  pin). Approve a `.claude/agents/` reviewer with that checklist?
 - **Test-site element inventory: hands-on pass** (the CD's request,
   2026-10-31): the first pass is `.claude/notes/test-site-element-inventory.md`,
   generic by rule (CLAUDE.md § Project pins: generic content only). The
@@ -44,11 +49,11 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   alternative (e.g. asyncio driving N Playwright browser contexts); the
   choice lands in `requirements.txt`;
   (c) target policy — which public site(s) are fine for 1-user
-  record/codegen, and what local target hosts multi-user runs;
+  record/codegen, and what local target hosts multi-user runs (the CD,
+  2026-10-31: a local test site on the PC or in a container, § Next);
   (d) record+codegen vs. hand-written scripts — Eval 01 used codegen
-  (`--target python-async`); (e) per-eval file contract (rubric format,
-  how fixtures are captured/regenerated) — Eval 01's layout is the first
-  draft. Outcome: an ADR + the matching `<FILL-IN>`s in CLAUDE.md and
+  (`--target python-async`); (e) per-eval file contract — settled for
+  script-fix cases by ADR-0001 (capture lands with grader-01 phase C). Outcome: an ADR + the matching `<FILL-IN>`s in CLAUDE.md and
   `.claude/standards/` resolved.
 
 <!-- --- -->
@@ -78,6 +83,13 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   required files exist, each `case.toml` is valid and each global-rubric
   case's `prompt.md` matches `rubrics/script-fix/prompt.md`. *Depends on:*
   Eval 01 (file contract), grader-01 phase C (case template).
+- **Private-names check script** (refine pass, 2026-10-31):
+  `.claude/scripts/check-private-names.ps1` scans the staged diff and the
+  commit message (or, with `-All`, every tracked file and the whole
+  history) against a local, untracked list of names
+  (`.claude/*.local.*`, gitignored). It replaces the hand greps run before
+  each commit since the 2026-10-30 leak, and works from oversee worktrees
+  by reading the list from the main checkout. Per the Script SOP.
 - **Isolated trial environment** — a container/WSL distro holding only
   `prompt.md` + `inputs/`, its own Python + Playwright + Claude Code and
   settings (permissions, no MCP servers); WSL needs `[automount]
@@ -91,16 +103,16 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **Complete the scaffold's `<FILL-IN>` markers** (left by
   `/zmh-producer:studio-init`; most resolve at the first-eval level-set):
   - [ ] `CLAUDE.md` — stack/version ADR pin; static-reviewer agent name;
-        trial-run loop + Playtest SOP; `skills/` list; per-eval file
-        contract (Eval anatomy); multi-user approach / local target /
-        codegen workflow (Tech stack)
+        multi-user approach / local target / codegen workflow (Tech
+        stack). Done: trial-run loop + Playtest SOP, `skills/` list,
+        file contract for script-fix cases (ADR-0001)
   - [ ] `.claude/zmh/producer.md` — Environment setup quirks (venv
         activation)
   - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
         remaining Playwright/Locust API pins (waits + transaction timers
         done)
-  - [ ] `.claude/standards/architecture.md` — learnings (grows over
-        time); shared-tooling location done (ADR-0001)
+  - [x] `.claude/standards/architecture.md` — shared-tooling location
+        (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
         (ADR-0001)
   - [ ] `.claude/standards/testing.md` — test/check runner; test directory

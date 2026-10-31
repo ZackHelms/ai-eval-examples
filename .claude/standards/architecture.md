@@ -39,9 +39,24 @@ captures run only against a local target (CLAUDE.md § Project pins).
 
 ## Learnings
 
-`<FILL-IN: repo-specific learnings as they accumulate — trace capture
-quirks, placeholder conventions, answer-leak patterns; each entry:
-symptom → root cause → the rule that prevents it.>`
+Each entry: symptom → root cause → the rule that prevents it. Add new ones
+as they're learned.
+
+- **Corrupted evidence.** Eval 01's first `results.txt` showed `╗`/`½`
+  where the page had `»`/`«`, and a model copied them into its fix →
+  Python wrote cp1252 and the pwsh console decoded it as cp437 → capture
+  with forced UTF-8 (`python -X utf8`), never by redirecting console
+  output.
+- **Evidence that points at the answer key.** The tracebacks in Eval 01's
+  `results.txt` name the repo path (the eval's `inputs\script.py`, the
+  repo's `.venv`), and trial run 10 followed one → the evidence was
+  captured inside the repo → capture from a neutral folder outside the
+  repo, with its own venv, and run trials outside the repo.
+- **A defect hidden behind the first.** Eval 01's second broken link
+  (line 20) never ran, because the run stopped at line 18, so no evidence
+  showed it, and most models missed it → one visible defect per case: cut
+  the script after the failing transaction, then capture (ADR-0001's case
+  contract).
 
 ## Decisions
 

@@ -2,6 +2,15 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-10-31** — Generic-content pin (CLAUDE.md § Project pins, the
+  CD's rule): no real product names, product docs, copied UI or
+  work-internal names in this public repo. The test-site element inventory
+  landed in `.claude/notes/` under it. The Locust eval lost its "02" so
+  it doesn't clash with grader-01's cases. Refine pass:
+  `.claude/skills/trial-runs.md` (headless launch, launcher gotchas,
+  transcript formats, replays), `.claude/notes/20261031-trial-statistics.md`,
+  architecture learnings, a public-repo rule in `commit.md`, and the
+  Playtest SOP and trial-run loop filled in.
 - **2026-10-30** — grader-01 design approved and phase A done: the CD's
   global-rubric idea became `.claude/plans/grader-01.global-rubric-design.md`
   (binary rubric with fix and escalate cases, fake-fix severities, tags,

@@ -78,9 +78,9 @@ one exists.
    versions changed (pins intact, no unmaintained or duplicate-purpose
    dependencies added).
 
-The trial-run loop is `<FILL-IN: how the CD trial-runs an eval — e.g. paste
-prompt.md into a fresh session that can see only inputs/, then grade the
-answer against grading/ — see Playtest SOP below>`.
+The trial-run loop: copy `prompt.md` + `inputs/` to a trial folder outside
+the repo, run the model headless, then grade against `grading/`
+(`.claude/skills/trial-runs.md`; see Playtest SOP below).
 
 ## Repository map
 
@@ -107,7 +107,7 @@ DONE.md                   # completed-work log
                 backlog-burndown, oversee-implementation, refine-context)
                 comes from the zmh-producer plugin, configured via
                 .claude/zmh/producer.md
-  skills/       reusable implementation knowledge (task-scoping, <FILL-IN>)
+  skills/       reusable implementation knowledge (task-scoping, trial-runs)
   standards/    coding, architecture, naming, testing, docs, commit, review
   workflows/    deterministic processes (plan-oversee-cycle, …)
   checklists/   per-workflow completion checklists
@@ -131,10 +131,9 @@ the tree above when they appear): `tools/` (shared tooling, ADR-0001) ·
 tooling and to `grading/` reference fixes, never to "fixing" `inputs/`
 outside the eval's own authoring. Nothing in `prompt.md` or `inputs/` may
 hint at the answer: no comments naming the bug, no file names like
-`fixed_*.py`, no reference-fix fragments. `<FILL-IN: settle the per-eval
-file contract at the first-eval session — required files in grading/
-(rubric format, reference fix layout), how results/traces are captured and
-how a fixture is regenerated>`.
+`fixed_*.py`, no reference-fix fragments. Script-fix cases follow ADR-0001's
+file contract (`case.toml`, `recipe.toml`, `reference/`, `corpus/`);
+capture and regeneration arrive with grader-01 phase C (`10-make-case.ps1`).
 
 ## Working process (do not skip)
 
@@ -197,8 +196,10 @@ level-set>`.
   `.follow-up.md`/TODO.md).
 - **Publish SOP:** none. Authorization: n/a (no publish step).
 - **Playtest SOP:** for this repo, "playtest" means **trial-running an
-  eval** against a model. `<FILL-IN: what the CD runs to trial an eval after
-  a green validation pass; "every committed eval must be trial-runnable">`.
+  eval** against a model, per `.claude/skills/trial-runs.md` (headless
+  `claude -p` from a trial folder outside the repo; `20-run-trials.ps1`
+  once grader-01 phase D lands). Every committed eval must be
+  trial-runnable.
 - **In-progress SOP:** yes — at most **one** `TODO.md` `## In progress`
   entry, opened before a multi-commit task begins and closed in its last
   commit.
