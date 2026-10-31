@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **grader-01b deterministic grader** (oversee run, 2026-10-31): plan
-  `.claude/plans/grader-01b.deterministic-grader.md`, started with
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01b.deterministic-grader.md`
-  on branch `worktree-oversee+grader-01b`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -22,11 +19,13 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **Global rubric + grader v0** (grader-01; the CD's work-scale idea):
   design approved 2026-10-30, `.claude/plans/grader-01.global-rubric-design.md`.
   One plan per phase: A decide (done: ADR-0001, `rubrics/script-fix/`) →
-  B deterministic grader + pytest gate + Eval 01 calibration (plan ready:
-  `.claude/plans/grader-01b.deterministic-grader.md`) → C cases
-  02–06 (neutral-folder capture, `10-make-case.ps1`; case 06 replaces the
-  impossible-locator eval) and D trial runner (`20-run-trials.ps1`) →
-  E LLM judge → F pilot. Absorbs the former § Next items Eval 01 grader,
+  B deterministic grader + pytest gate + Eval 01 calibration (done
+  2026-10-31: `tools/scriptfix/`, `30-grade-trials.ps1`,
+  `.claude/plans/DONE/grader-01b.deterministic-grader.md`) → **next:** C
+  cases 02–06 (neutral-folder capture, `10-make-case.ps1`; case 06
+  replaces the impossible-locator eval) and D trial runner
+  (`20-run-trials.ps1`), plans to draft → E LLM judge (resolves Eval 01's
+  `pending-judge` runs 10 and 12) → F pilot. Absorbs the former § Next items Eval 01 grader,
   Capture script, Trial runner script and Eval: impossible locator.
 
 <!-- --- -->
@@ -80,7 +79,15 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   results and pwtrace for a 1 user 1 iteration replay in
   `$somedirectory`"*. *Depends on:* local test site, Eval 01 (eval
   anatomy settled).
-- **Eval-integrity gate** — a check script that becomes the hard gate:
+- **Grader hardening (grader-01b residue)** — known gaps in
+  `tools/scriptfix`, none affecting Eval 01:
+  `.claude/plans/DONE/grader-01b.deterministic-grader.follow-up.md`
+  § Deferred. The main one needs a CD design call: a step is any method
+  named like a Playwright action, so `seen.clear()` on a plain set reads
+  as a path step. The rest are mechanical (`**opts` timeouts, recursive
+  searches above the repo). *Depends on:* nothing; best before phase F's
+  pilot.
+- **Eval-integrity gate** — checks that join the pytest hard gate:
   every `prompt.md` placeholder resolves under `inputs/`, nothing in
   `prompt.md`/`inputs/` references `grading/` or names the repo's path,
   required files exist, each `case.toml` is valid and each global-rubric

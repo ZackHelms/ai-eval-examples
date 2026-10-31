@@ -1,6 +1,8 @@
 # grader-01b — deterministic grader for rubric script-fix-v0
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-10-31 (oversee run, commits `3b65e05`..`37f73f8`
+plus the wrap-up; § Calibration matched exactly; see
+`grader-01b.deterministic-grader.follow-up.md`).
 **Requested:** 2026-10-30 (grader-01 phase B; design approved the same day).
 **Scope:** new `tools/scriptfix/`, `tools/tests/`, `pytest.ini`,
 `30-grade-trials.ps1`; `requirements.txt`, `.gitignore`; Eval 01's
