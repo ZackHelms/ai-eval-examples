@@ -107,8 +107,12 @@ if (-not $Report) {
 }
 
 # The work runs in a child scope so StrictMode, $ErrorActionPreference and the
-# helper variables don't leak into your session. Its result is the exit code.
-$exitCode = & {
+# helper variables don't leak into your session. Python's exit code lands in
+# $script:exitCode (the block's own output is not captured, so Python's isn't).
+# $PSBoundParameters inside the block is the block's own, so capture it here.
+$timeoutGiven = $PSBoundParameters.ContainsKey('Timeout')
+$script:exitCode = 0
+& {
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
 
@@ -131,7 +135,7 @@ $exitCode = & {
     foreach ($option in $optional) {
         if ($option[1]) { $pyArgs += @($option[0], $option[1]) }
     }
-    if ($PSBoundParameters.ContainsKey('Timeout')) { $pyArgs += @('--timeout', "$Timeout") }
+    if ($timeoutGiven) { $pyArgs += @('--timeout', "$Timeout") }
 
     # `python -m scriptfix` needs tools\ on the path; restore the caller's value
     # afterwards because env changes are process-wide.
@@ -139,9 +143,8 @@ $exitCode = & {
     Push-Location $repoRoot
     try {
         $env:PYTHONPATH = Join-Path $repoRoot 'tools'
-        # Out-Host keeps Python's output out of this block's result (the exit code).
-        & $venvPython @pyArgs | Out-Host
-        $LASTEXITCODE
+        & $venvPython @pyArgs
+        $script:exitCode = $LASTEXITCODE
     } finally {
         Pop-Location
         $env:PYTHONPATH = $previousPythonPath
