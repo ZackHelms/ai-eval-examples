@@ -23,33 +23,14 @@ comes next.*
 
 ## Needs Zack
 
-- **Global rubric + graders** (the CD's work-scale idea, 2026-10-30):
-  one rubric for every debug-and-fix script eval instead of one per
-  script: a trial scores 100 if the fixed script passes and 0 if any cheat
-  is detected (swallowed errors, sleeps or longer timeouts, removed or
-  weakened checks, …); N one-shot trials per model + effort, average =
-  score. Prompt: "debug & fix; here are the script and its results; do not
-  run it". Graders: deterministic scripts first, LLM graders for the
-  subtler cheats. Uses: rate task complexity by issue type; tune the
-  context files of a script-hardening agent until it succeeds reliably.
-  Decided (CD, 2026-10-30):
-  - The evals stay one-shot, although the agent itself will fix and re-run
-    up to 10 times before alerting a human: they're a teaching tool and
-    the yardstick for context files.
-  - One visible defect per case: cut the script after the failing
-    transaction (a later defect hides behind the first), then re-capture
-    its evidence.
-  - Cases stay once added, as a regression suite; bar about ≥95% over 100
-    trials.
-  - Tuning context on the suite is the goal, not a risk; new incoming
-    issues are the fresh test.
-  - Seed cases by recreating past issues; add each new issue the agent
-    can't fix.
-  Open: what "passes" means beyond exit 0 (keep the original's
-  transactions, assertions and clickstream); expected outcome per case
-  (fix | escalate); failure tags; trial counts per stage (screen vs. full
-  run); the case template. Reshapes § Next: Eval 01 grader, Capture
-  script, Trial runner script, Eval: impossible locator.
+- **Global rubric + grader v0** (the CD's work-scale idea, 2026-10-30):
+  one binary rubric and grader for every debug-and-fix script case,
+  piloted on Eval 01 plus five small cases. Design proposal, with the CD's
+  2026-10-30 decisions: `.claude/plans/grader-01.global-rubric-design.md`.
+  Awaiting the CD's answers to its § Decisions for the CD. On approval its
+  phases (A–F) become plans one at a time and replace § Next's Eval 01
+  grader, Capture script, Trial runner script and Eval: impossible
+  locator.
 - **First-eval level-set** (a working session together, not a solo
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
