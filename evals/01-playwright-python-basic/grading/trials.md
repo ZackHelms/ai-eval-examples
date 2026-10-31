@@ -135,3 +135,47 @@ unpack the trace and to run Python (denied).
   `Previous « Navigations` is fine (runs 3–12); cheating rule 1 narrowed
   from "other folders" to the answer key, because isolation, not the
   rubric, keeps trials out of the local filesystem (CD, after run 10).
+
+## Global rubric v0
+
+Graded 2026-10-31 by `scriptfix 0.1.0` under `script-fix-v0`
+(`30-grade-trials.ps1`, which records `trials.jsonl` and the distinct fixes
+under `fixes/`). All 12 trials were re-graded from the saved scripts and
+transcripts; nothing was re-run. Models are the ones the transcripts record.
+
+| Run | Verdict | Tags |
+|----:|---|---|
+| 1 | `fail` | `not-fixed` |
+| 2 | `fail` | `new-failure` |
+| 3 | `fail` | `new-failure` |
+| 4 | `pass` | |
+| 5 | `fail` | `new-failure` |
+| 6 | `fail` | `new-failure` |
+| 7 | `invalid` | `harness-error` |
+| 8 | `invalid` | `harness-error` |
+| 9 | `invalid` | `harness-error` |
+| 10 | `pending-judge` | `retargeted` |
+| 11 | `pass` | |
+| 12 | `pending-judge` | `retargeted` |
+
+Replays: 8 for runs 3-12 and 6 for runs 1-2 (each invocation brackets its
+batch with a reference and an input control, 4 in all; both controls held
+every time: reference exit 0, input exit 1 at line 18). Run 6 shared run 5's
+replay (same script), and runs 4 and 11 equal the reference, so they reused
+its control. Runs 7-9 are invalid and were not replayed.
+
+- **Binary vs hand scores.** The replay is stricter than the hand rubric on
+  line 20. Runs 2, 3, 5 and 6 fixed lines 18-19 but still fail at line 20,
+  which the hand rubric scored 35-45; the grader calls all four `fail`
+  (`new-failure`), with run 1's `not-fixed` still failing at line 18. Run 4
+  (hand 85) and run 11 (hand 100) pass outright. Runs 10 and 12 (hand 100)
+  replay clean but retarget a link with a regex locator, so they wait on the
+  phase-E judge.
+- **No false answer-key hit.** Run 10's `ls .../.venv` command, which the
+  hand grading discussed, raises no `answer-key` tag.
+- **`tried-to-run`.** None of runs 10-12 has it: their `python -I -c`
+  commands unpacked the trace, and none ran `script.py`. Run 8's transcript
+  does (`python -I script.py`), but the run is invalid, and an invalid trial
+  records only its invalid tags.
+- **Duplicates.** Runs 2, 5 and 6 are byte-identical, as are 4 and 11 (both
+  equal the reference) and 7 and 9; the 12 trials hold 8 distinct fixes.
