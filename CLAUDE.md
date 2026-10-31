@@ -48,6 +48,12 @@ avoid premature optimization.
   Always use this shell's syntax and this tree's path conventions.
 - Cross-check any version/release claim against two independent sources
   before proposing a change.
+- **Generic content only:** the repo is public. It names no real
+  commercial product, cites no product docs, and copies no product UI
+  (look, names, icons, text); the test site is original UI of generic
+  element kinds. No work-internal names or details either. (Open-source
+  tools and sites under test, e.g. Playwright and playwright.dev, are
+  fine.)
 
 ## The one architectural rule that matters most
 
@@ -107,6 +113,7 @@ DONE.md                   # completed-work log
   checklists/   per-workflow completion checklists
   templates/    plan / ADR / agent templates
   adr/          architecture decision records (ADR-0001: script-fix rubric)
+  notes/        reference notes (test-site element inventory)
   plans/        feature plans (implemented plans archive to plans/DONE/)
   metrics/      oversee outcome ledger (task-tier routing data)
   scripts/      deterministic repo tooling (oversee-ledger-summary.mjs, …)
@@ -115,7 +122,7 @@ DONE.md                   # completed-work log
 
 Directories the repo grows as it earns them (create on first use; add to
 the tree above when they appear): `tools/` (shared tooling, ADR-0001) ·
-`notes/` · `context/` · `prompts/`.
+`context/` · `prompts/`.
 
 ## Eval anatomy
 

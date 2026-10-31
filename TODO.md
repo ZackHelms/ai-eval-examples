@@ -30,14 +30,12 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Needs Zack
 
-- **Test-site element inventory** (the CD's request, 2026-10-31): the
-  kinds of elements and page layouts an enterprise analytics web app has,
-  for the local test site to mimic. A research pass from public docs is
-  done and with the CD, kept out of this public repo because it names the
-  product it models. Decide: may committed files name it, or should they
-  stay generic? Then a hands-on pass on the real apps at work turns its
-  "typical" rows into facts: which component patterns break scripts
-  (pattern names only, no product DOM). Feeds the local test site.
+- **Test-site element inventory: hands-on pass** (the CD's request,
+  2026-10-31): the first pass is `.claude/notes/test-site-element-inventory.md`,
+  generic by rule (CLAUDE.md § Project pins: generic content only). The
+  CD's pass on real apps marks which of its element patterns break scripts
+  in practice, and adds any missing ones (pattern names only). Feeds the
+  local test site.
 - **First-eval level-set** (a working session together, not a solo
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
@@ -60,9 +58,9 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **Local test site** (the CD's request, 2026-10-30; absorbs "Local load
   target"): a locally hosted web app (on the PC or in a container), more
   complex than playwright.dev, with a variety of elements in different
-  parts of the site for Playwright scripts to exercise (the element
-  inventory, § Needs Zack): a "release" switch per component for drift
-  cases, fixed seeded delays for timing cases. Serves varied
+  parts of the site for Playwright scripts to exercise
+  (`.claude/notes/test-site-element-inventory.md`): a release switch per
+  component for drift cases, fixed seeded delays for timing cases. Serves varied
   generated cases, timing cases with controllable delays, grader-01 full
   runs at suite scale, and the multi-user runs that may never hit a
   third-party site (CLAUDE.md § Project pins: load-test safety).
