@@ -58,8 +58,8 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   third-party site (CLAUDE.md § Project pins: load-test safety).
   *Depends on:* level-set (b, c) for the multi-user side; the single-user
   side can start sooner.
-- **Eval 02 — Playwright + Locust multi-user debug & fix** — the framing
-  prompt: *"debug & fix this playwright+python+locust script `$somescript`;
+- **Eval: Playwright + Locust multi-user debug & fix** (numbered when
+  built; 02–06 go to grader-01's cases) — the framing prompt: *"debug & fix this playwright+python+locust script `$somescript`;
   you can find the results and pwtrace for a 1 user 1 iteration replay in
   `$somedirectory`"*. *Depends on:* local test site, Eval 01 (eval
   anatomy settled).
