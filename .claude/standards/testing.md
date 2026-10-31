@@ -1,13 +1,11 @@
 # Testing Standards
 
-Runner: `<FILL-IN: test/check runner, invoked non-interactively — a single
-run, never watch mode>`. Philosophy: every eval becomes reproducible and
-checkable; avoid relying solely on manual trial runs.
+Runner: pytest, one non-interactive run:
+`.\.venv\Scripts\python.exe -m pytest`. Philosophy: every eval becomes
+reproducible and checkable; avoid relying solely on manual trial runs.
 
-> **Current reality:** the hard gate is "none yet" — trivially green until
-> the toolchain is scaffolded (no tests exist); reports say so, never skip
-> silently. Once it lands, a change with tests isn't green until they
-> execute and pass via the gate.
+> **Current reality:** pytest is the hard gate (since grader-01b). A
+> change with tests isn't green until they execute and pass via the gate.
 
 ## What to test
 
@@ -31,6 +29,6 @@ checkable; avoid relying solely on manual trial runs.
   not implementation details.
 
 One behavior per test, descriptive names. Tests live beside their subject,
-or under `<FILL-IN: this repo's test directory>`. A change is not done
+or under `tools/tests/`. A change is not done
 until the validation procedure passes — and the report says explicitly if
 tests were not executed.

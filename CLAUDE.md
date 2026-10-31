@@ -72,8 +72,8 @@ one exists.
    eval-structure reviewer>` (checklist baked in; zero Blockers to pass).
    Cheap; catches answer leaks and placeholder mismatches before spending a
    gate run.
-2. **Hard gate:** none yet — gate is trivially green until the toolchain is
-   scaffolded; say so, never skip silently.
+2. **Hard gate:** `.\.venv\Scripts\python.exe -m pytest` from the repo
+   root (`pytest.ini` points it at `tools/tests/`); it must exit 0.
 3. **Dependency/manifest sanity** when the venv requirements or tool
    versions changed (pins intact, no unmaintained or duplicate-purpose
    dependencies added).
@@ -92,6 +92,7 @@ evals/<slug>/             # one self-contained eval (created with the first eval
   inputs/                 #   everything the model under test sees
   grading/                #   reference fix + rubric or case.toml (hidden from the model)
 rubrics/                  # shared, versioned rubrics + prompts (script-fix: ADR-0001)
+tools/                    # shared tooling: the scriptfix grader + its pytest tests (ADR-0001)
 README.md                 # human-facing project overview
 TODO.md                   # the backlog — Claude-maintained (see Backlog SOP)
 DONE.md                   # completed-work log
@@ -121,8 +122,7 @@ DONE.md                   # completed-work log
 ```
 
 Directories the repo grows as it earns them (create on first use; add to
-the tree above when they appear): `tools/` (shared tooling, ADR-0001) ·
-`context/` · `prompts/`.
+the tree above when they appear): `context/` · `prompts/`.
 
 ## Eval anatomy
 

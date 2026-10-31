@@ -4,7 +4,8 @@ Reference for choosing trial counts (rubric `script-fix-v0`'s stages: see
 `.claude/plans/grader-01.global-rubric-design.md` § Trial stages). The
 bounds are one-sided 95% lower bounds on the true pass rate (Clopper–Pearson).
 The lower bound solves P(X ≥ k | p) = 0.05; for k = n it is 0.05^(1/n).
-`scriptfix.stats.lower_bound` computes it once grader-01b lands.
+`scriptfix.stats.lower_bound` computes it (`30-grade-trials.ps1 -Report`
+prints it per case and subject).
 
 | Observed | True rate likely ≥ |
 |---|---|

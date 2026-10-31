@@ -21,7 +21,7 @@
 
 ## Validation
 - Procedure: CLAUDE.md § Validation
-- Hard gate command: none yet — gate is trivially green until the toolchain is scaffolded; say so, never skip silently
+- Hard gate command: `.\.venv\Scripts\python.exe -m pytest`
 
 ## Integration (oversee wrap-up)
 - Mode: direct-merge-push

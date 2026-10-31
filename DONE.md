@@ -2,6 +2,20 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-10-31** — grader-01 phase B, the deterministic grader (oversee
+  run of `.claude/plans/DONE/grader-01b.deterministic-grader.md`):
+  - `tools/scriptfix/` (standard library only) grades script-fix trials
+    under rubric `script-fix-v0`: transcript validity and fair play, a
+    journey comparison, fake-fix detectors, one replay per distinct fix
+    between control replays, and a record in `grading/trials.jsonl` plus
+    `grading/fixes/`. Trials that need the judge come out as
+    `pending-judge`.
+  - `30-grade-trials.ps1` wraps it.
+  - pytest 9.2.0 is the hard gate: 432 tests, including Eval 01's
+    23-file labeled corpus.
+  - Calibration on Eval 01's 12 trials matched exactly in 14 replays:
+    runs 4 and 11 pass, 1–3 and 5–6 fail, 10 and 12 wait on the judge,
+    and 7–9 are invalid.
 - **2026-10-31** — Generic-content pin (CLAUDE.md § Project pins, the
   CD's rule): no real product names, product docs, copied UI or
   work-internal names in this public repo. The test-site element inventory
