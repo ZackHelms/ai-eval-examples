@@ -3,8 +3,10 @@
 ## Evals
 
 - **Eval folders:** `evals/<slug>/`, kebab-case slug naming the task, e.g.
-  `evals/playwright-basic-debug/`. `<FILL-IN: whether slugs carry a
-  numeric prefix, decided with the first eval>`.
+  `evals/playwright-basic-debug/`, with a two-digit prefix in creation
+  order: `evals/01-playwright-python-basic/`. Names describe the task or
+  the journey, never the defect (`evals/02-docs-journey-a/`); trial
+  folders use the number only (`02-run7`).
 - **Inside an eval:** `prompt.md`, `inputs/`, `grading/` (see
   `architecture.md`). Input file names must not leak the answer (no
   `broken_*`, `fixed_*`, `bug_*`).

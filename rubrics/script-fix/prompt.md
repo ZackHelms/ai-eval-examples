@@ -1,0 +1,1 @@
+Debug and fix inputs/script.py. It failed when run: its console output and exit code are in inputs/results.txt, and the Playwright trace of that run is inputs/script.pwtrace.zip. Don't run the script; fix it from this evidence. If a step can't be fixed without a decision from me, tell me which step and why.

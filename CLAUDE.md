@@ -84,7 +84,8 @@ CLAUDE.md                 # the PRIMARY AI context file (only one outside .claud
 evals/<slug>/             # one self-contained eval (created with the first eval)
   prompt.md               #   the task prompt; placeholders → inputs/ paths
   inputs/                 #   everything the model under test sees
-  grading/                #   reference fix + rubric (hidden from the model)
+  grading/                #   reference fix + rubric or case.toml (hidden from the model)
+rubrics/                  # shared, versioned rubrics + prompts (script-fix: ADR-0001)
 README.md                 # human-facing project overview
 TODO.md                   # the backlog — Claude-maintained (see Backlog SOP)
 DONE.md                   # completed-work log
@@ -105,6 +106,7 @@ DONE.md                   # completed-work log
   workflows/    deterministic processes (plan-oversee-cycle, …)
   checklists/   per-workflow completion checklists
   templates/    plan / ADR / agent templates
+  adr/          architecture decision records (ADR-0001: script-fix rubric)
   plans/        feature plans (implemented plans archive to plans/DONE/)
   metrics/      oversee outcome ledger (task-tier routing data)
   scripts/      deterministic repo tooling (oversee-ledger-summary.mjs, …)
@@ -112,7 +114,7 @@ DONE.md                   # completed-work log
 ```
 
 Directories the repo grows as it earns them (create on first use; add to
-the tree above when they appear): `adr/` (architecture decision records) ·
+the tree above when they appear): `tools/` (shared tooling, ADR-0001) ·
 `notes/` · `context/` · `prompts/`.
 
 ## Eval anatomy

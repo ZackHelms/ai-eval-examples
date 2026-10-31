@@ -2,6 +2,15 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-10-30** — grader-01 design approved and phase A done: the CD's
+  global-rubric idea became `.claude/plans/grader-01.global-rubric-design.md`
+  (binary rubric with fix and escalate cases, fake-fix severities, tags,
+  grader pipeline, case template, trial stages and their statistics, a
+  pilot on Eval 01 plus five cases). The CD took all nine decisions as
+  recommended, except that added assertions are welcome rather than a
+  smell. Phase A: ADR-0001, `rubrics/script-fix/rubric-v0.md` + `prompt.md`,
+  shared-tooling location and eval-name prefix settled in the standards.
+  The local test site joined the backlog, absorbing the local load target.
 - **2026-10-30** — Eval 01, `evals/01-playwright-python-basic/`, built by
   hand with the CD to learn the process: codegen recording, a `»`/`«` →
   `>`/`<` break in two link names, prompt, rubric, reference fix, and 12

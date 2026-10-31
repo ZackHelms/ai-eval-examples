@@ -17,12 +17,17 @@ evals/<slug>/
   grading/       reference fix + rubric (+ any automated check)
 ```
 
+A `grading/` holds either its own `rubric.md` (Eval 01) or a `case.toml`
+naming a shared rubric under `rubrics/`, e.g. `script-fix-v0`
+(ADR-0001, which lists the rest of a script-fix case's files).
+
 Dependencies point one way: `grading/` may reference `inputs/` (a check
 runs the reference fix against the same evidence); `prompt.md` and
 `inputs/` never reference `grading/`. Shared tooling (env setup, local load
 targets, capture scripts) lives outside `evals/` and is referenced, not
-copied, by evals — `<FILL-IN: shared-tooling location, decided when the
-first shared script lands>`.
+copied, by evals: Python packages under `tools/` (tests in
+`tools/tests/`), CD-facing entry points as numbered pwsh scripts at the
+repo root, shared rubrics and prompts under `rubrics/` (ADR-0001).
 
 ## Reproducibility
 

@@ -18,7 +18,7 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 - **Global rubric + grader v0** (grader-01; the CD's work-scale idea):
   design approved 2026-10-30, `.claude/plans/grader-01.global-rubric-design.md`.
-  One plan per phase: A decide (ADR-0001, `rubrics/script-fix/`) →
+  One plan per phase: A decide (done: ADR-0001, `rubrics/script-fix/`) →
   B deterministic grader + pytest gate + Eval 01 calibration → C cases
   02–06 (neutral-folder capture, `10-make-case.ps1`; case 06 replaces the
   impossible-locator eval) and D trial runner (`20-run-trials.ps1`) →
@@ -89,9 +89,10 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
         remaining Playwright/Locust API pins (waits + transaction timers
         done)
-  - [ ] `.claude/standards/architecture.md` — shared-tooling location;
-        learnings (grows over time)
-  - [ ] `.claude/standards/naming.md` — eval slug numeric prefix
+  - [ ] `.claude/standards/architecture.md` — learnings (grows over
+        time); shared-tooling location done (ADR-0001)
+  - [x] `.claude/standards/naming.md` — eval slug numeric prefix
+        (ADR-0001)
   - [ ] `.claude/standards/testing.md` — test/check runner; test directory
   - [ ] `.claude/standards/review.md` — static-reviewer version/API pins
   - [ ] `.claude/agents/README.md` — specialist agents table; anticipated

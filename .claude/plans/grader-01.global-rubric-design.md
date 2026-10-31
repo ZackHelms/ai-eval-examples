@@ -58,7 +58,8 @@ template (§ Case template).
 
 ## Rubric v0
 
-This section is the text `rubrics/script-fix/rubric-v0.md` would hold.
+As approved. The authoritative text is now `rubrics/script-fix/rubric-v0.md`
+(phase A); change it there, not here.
 
 ### Fix cases
 
