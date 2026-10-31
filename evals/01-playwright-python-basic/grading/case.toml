@@ -1,0 +1,8 @@
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["locator-text"]
+origin   = "handmade"
+defect   = "Two link names have > or < where the page has » or «: the Next link (lines 18-19) and the Previous link (line 20). The run fails at line 18, so line 20's defect is hidden."
+fails_at = 18
+target   = "https://playwright.dev"
+note     = "Calibration case: two defects and an older prompt; graded by both its own rubric.md and script-fix-v0."
