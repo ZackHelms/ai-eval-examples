@@ -490,7 +490,10 @@ def grade(
     ``~/.claude/projects``. ``replay_fn`` defaults to ``scriptfix.replay.replay``
     looked up at call time. Replays are strictly sequential. Nothing is
     written to the case until every verdict (and the closing controls) is
-    in, so a crash leaves the case as it was.
+    in, so a crash leaves the case as it was; and when a control replay is
+    surprising nothing is written at all (the batch is void, so earlier
+    valid verdicts must survive), though the result still lists every trial
+    as ``invalid`` / ``site-changed``.
     """
     case = load_case(Path(case_dir))
     if case.expected not in (EXPECTED_FIX, EXPECTED_ESCALATE):
@@ -534,37 +537,42 @@ def grade(
     for item in outcomes:
         out(_trial_line(item))
 
-    # Persist: fixes first (they are evidence even for invalid trials).
-    fixes_written: list[Path] = []
-    for item in outcomes:
-        if item.script_data is not None:
-            digest, written = save_fix(case.grading_dir, item.script_data)
-            if written:
-                fixes_written.append(case.grading_dir / "fixes" / f"{digest}.py")
-    records = [
-        make_record(
-            run=item.run,
-            date=when,
-            rubric=RUBRIC,
-            grader=__version__,
-            subject={
-                "model": item.model,
-                "effort": effort,
-                "context": context,
-                "tools": tools,
-                "cli": item.cli,
-            },
-            verdict=item.verdict,
-            tags=item.tags,
-            fix=item.fix,
-            session=item.session,
-            cost_usd=item.cost_usd,
-            replay=replay_record(item.replay),
-        )
-        for item in outcomes
-    ]
     trials_path = case.grading_dir / "trials.jsonl"
-    update_trials(trials_path, records)
+    fixes_written: list[Path] = []
+    if failure:
+        # A surprising control voids the batch (rubric-v0, Invalid trials):
+        # record nothing, so earlier valid verdicts survive an outage.
+        out("control failed: nothing recorded")
+    else:
+        # Fixes first: they are the evidence behind each line.
+        for item in outcomes:
+            if item.script_data is not None:
+                digest, written = save_fix(case.grading_dir, item.script_data)
+                if written:
+                    fixes_written.append(case.grading_dir / "fixes" / f"{digest}.py")
+        records = [
+            make_record(
+                run=item.run,
+                date=when,
+                rubric=RUBRIC,
+                grader=__version__,
+                subject={
+                    "model": item.model,
+                    "effort": effort,
+                    "context": context,
+                    "tools": tools,
+                    "cli": item.cli,
+                },
+                verdict=item.verdict,
+                tags=item.tags,
+                fix=item.fix,
+                session=item.session,
+                cost_usd=item.cost_usd,
+                replay=replay_record(item.replay),
+            )
+            for item in outcomes
+        ]
+        update_trials(trials_path, records)
 
     counts: dict[str, int] = {}
     for item in outcomes:
@@ -572,9 +580,10 @@ def grade(
     summary = ", ".join(f"{verdict} {count}" for verdict, count in sorted(counts.items()))
     out(f"summary: {summary or 'no runs'}")
     out(f"replays run: {replays.count}")
-    out(f"wrote {trials_path}")
-    for path in fixes_written:
-        out(f"wrote {path}")
+    if not failure:
+        out(f"wrote {trials_path}")
+        for path in fixes_written:
+            out(f"wrote {path}")
 
     return GradeResult(
         outcomes=tuple(outcomes),

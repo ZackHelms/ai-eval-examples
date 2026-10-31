@@ -163,6 +163,15 @@ class World:
             **kwargs,
         )
 
+    def seed_prior_record(self) -> bytes:
+        """Write a prior valid verdict for run 1 and return the file's bytes."""
+        prior = {"run": 1, "rubric": "script-fix-v0", "verdict": "pass", "tags": [], "fix": "abc"}
+        write_trials(self.trials_path, [prior])
+        return self.trials_path.read_bytes()
+
+    def fix_files(self) -> list[Path]:
+        return sorted((self.case_dir / "grading" / "fixes").glob("*.py"))
+
     def records(self) -> list[dict]:
         return read_trials(self.trials_path)
 
@@ -449,8 +458,9 @@ def test_only_trials_that_reach_the_replay_rule_replay(tmp_path: Path) -> None:
 # -- controls ----------------------------------------------------------------
 
 
-def test_opening_control_failure_voids_everything_and_spares_the_site(tmp_path: Path) -> None:
+def test_opening_control_failure_voids_everything_and_records_nothing(tmp_path: Path) -> None:
     world = World(tmp_path)
+    prior = world.seed_prior_record()
     world.fake.set(REFERENCE, ReplayResult(exit_code=1, timed_out=False, failing_line=9, output="a\nb\nTimeoutError: nope\n"))
     world.add_good_trial(1, REFERENCE + "# a\n")
     world.add_good_trial(2, REFERENCE.replace("Next \u00bb", "Next"))
@@ -461,7 +471,10 @@ def test_opening_control_failure_voids_everything_and_spares_the_site(tmp_path: 
     text = "\n".join(world.output)
     assert "opening reference control failed" in text and "exit code 1" in text
     assert "failing line 9" in text and "TimeoutError: nope" in text
-    assert [r["tags"] for r in world.records()] == [["site-changed"], ["site-changed"]]
+    assert "control failed: nothing recorded" in text
+    assert "run 1: invalid [site-changed]" in text
+    assert world.trials_path.read_bytes() == prior  # the earlier valid verdict survives
+    assert world.fix_files() == [] and result.fixes_written == ()
 
 
 def test_opening_input_control_must_fail_at_fails_at(tmp_path: Path) -> None:
@@ -475,8 +488,9 @@ def test_opening_input_control_must_fail_at_fails_at(tmp_path: Path) -> None:
     assert result.replay_count == 2
 
 
-def test_closing_control_failure_voids_every_trial(tmp_path: Path) -> None:
+def test_closing_control_failure_voids_every_trial_and_records_nothing(tmp_path: Path) -> None:
     world = World(tmp_path)
+    prior = world.seed_prior_record()
     world.fake.set(REFERENCE, [OK, failed_at(9)])  # fine before, surprising after
     world.add_good_trial(1, REFERENCE + "# a\n")  # would have passed
     fix = REFERENCE.replace("Next \u00bb", "Next")
@@ -487,7 +501,9 @@ def test_closing_control_failure_voids_every_trial(tmp_path: Path) -> None:
     assert all((o.verdict, o.tags) == ("invalid", ("site-changed",)) for o in result.outcomes)
     assert all(o.replay is None for o in result.outcomes)
     assert "closing reference control failed" in "\n".join(world.output)
-    assert {r["verdict"] for r in world.records()} == {"invalid"}
+    assert "control failed: nothing recorded" in "\n".join(world.output)
+    assert world.trials_path.read_bytes() == prior  # the earlier valid verdict survives
+    assert world.fix_files() == [] and result.fixes_written == ()
 
 
 def test_console_output_has_a_line_per_trial_and_a_summary(tmp_path: Path) -> None:
