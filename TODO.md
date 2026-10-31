@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **grader-01b deterministic grader** (oversee run, 2026-10-31): plan
+  `.claude/plans/grader-01b.deterministic-grader.md`, started with
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01b.deterministic-grader.md`
+  on branch `worktree-oversee+grader-01b`. No commits landed yet.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
