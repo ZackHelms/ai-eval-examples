@@ -177,20 +177,22 @@ def is_assertion_call(call: ast.Call) -> bool:
 def classify_call(call: ast.Call, receiver: str | None) -> str | None:
     """Return the step kind of ``call``, or ``None`` if it isn't a step.
 
-    ``receiver`` is the (normalized) unparsed receiver, used only to decide
-    whether ``start``/``stop``/... are tracing calls; ``None`` for a bare
-    function call. Markers aren't calls in this sense: they are recognized on
-    ``with`` items only.
+    Only method calls (``<receiver>.<name>(...)``) are steps: a bare call
+    such as ``type(x)`` or a script's own ``check()`` helper never is, so
+    a built-in or helper can't pose as a journey step. ``receiver`` is the
+    (normalized) unparsed receiver, used only to decide whether
+    ``start``/``stop``/... are tracing calls. Markers aren't calls in this
+    sense: they are recognized on ``with`` items only, bare or not.
     """
+    func = call.func
+    if not isinstance(func, ast.Attribute):
+        return None
     if is_assertion_call(call):
         return KIND_ASSERTION
-    name = call_name(call)
-    if name is None:
-        return None
+    name = func.attr
     if name in _KIND_BY_NAME:
         return _KIND_BY_NAME[name]
-    func = call.func
-    if name in EXPECT_SETUP and isinstance(func, ast.Attribute) and is_expect_ref(func.value):
+    if name in EXPECT_SETUP and is_expect_ref(func.value):
         return KIND_SETUP
     if name in TRACING_SETUP and receiver is not None and receiver.endswith(TRACING_SUFFIX):
         return KIND_SETUP

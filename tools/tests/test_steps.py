@@ -209,9 +209,32 @@ def test_double_star_kwargs_are_kept_as_values() -> None:
     assert step.values == ("url", "**extra")
 
 
-def test_bare_name_step_has_an_empty_target() -> None:
-    step = steps_of('click(locator)')[0]
-    assert (step.kind, step.target, step.values) == (KIND_ACTION, "", ("locator",))
+@pytest.mark.parametrize("call", ["type(x)", "check()", "close()", "click(locator)"])
+def test_bare_name_call_is_not_a_step(call: str) -> None:
+    assert steps_of(call) == []
+
+
+def test_bare_call_wrapping_a_bare_call_has_no_steps() -> None:
+    assert steps_of("print(type(x))") == []
+
+
+def test_arguments_of_a_bare_call_are_still_searched() -> None:
+    assert kinds_and_names("foo(page.click('a'))") == [(KIND_ACTION, "click")]
+
+
+def test_bare_helper_call_between_steps_keeps_the_same_steps() -> None:
+    plain = """
+        page.goto("a")
+        page.click("b")
+    """
+    with_helper = """
+        page.goto("a")
+        check(close(type(page)))
+        page.click("b")
+    """
+    assert [(s.kind, s.name, s.target, s.values) for s in steps_of(with_helper)] == [
+        (s.kind, s.name, s.target, s.values) for s in steps_of(plain)
+    ]
 
 
 # --- source order -----------------------------------------------------------

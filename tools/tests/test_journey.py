@@ -125,6 +125,15 @@ def test_changed_journey_skips_the_assertion_rules() -> None:
     assert tags(fix) == ["changed-journey"]
 
 
+def test_bare_helper_call_between_steps_does_not_change_the_journey() -> None:
+    fix = edit(
+        '    await page.get_by_role("link", name="Next").click()\n',
+        "    check(type(page))\n    close()\n"
+        '    await page.get_by_role("link", name="Next").click()\n',
+    )
+    assert journey(fix) == []
+
+
 def test_new_wait_does_not_change_the_journey() -> None:
     fix = edit(
         '    await page.get_by_role("link", name="Next").click()\n',
