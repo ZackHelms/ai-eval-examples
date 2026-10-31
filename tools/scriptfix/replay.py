@@ -20,7 +20,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-# How long to wait for output after the process tree has been killed.
+# How long to wait for the script process to exit after its tree is killed.
 _DRAIN_TIMEOUT_S = 10
 
 # A traceback frame line: ``  File "<path>", line <n>, in <name>``.
@@ -105,30 +105,29 @@ def replay(script: Path, *, python: Path, timeout_s: int = 120) -> ReplayResult:
     copy = workdir / "script.py"
     copy.write_bytes(data)
 
-    process = subprocess.Popen(
-        [str(python), "-X", "utf8", "script.py"],
-        cwd=workdir,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        start_new_session=sys.platform != "win32",  # own group, so killpg works
-    )
+    # Output goes to a file, not a pipe: a descendant that outlives the
+    # script (Playwright's driver inherits stderr) would otherwise hold a pipe
+    # open and block or blank the result.
+    out_path = workdir / "output.txt"
     timed_out = False
-    try:
-        raw, _ = process.communicate(timeout=timeout_s)
-    except subprocess.TimeoutExpired:
-        timed_out = True
+    with out_path.open("wb") as sink:
+        process = subprocess.Popen(
+            [str(python), "-X", "utf8", "script.py"],
+            cwd=workdir,
+            stdin=subprocess.DEVNULL,
+            stdout=sink,
+            stderr=subprocess.STDOUT,
+            start_new_session=sys.platform != "win32",  # own group, so killpg works
+        )
         try:
-            _kill_tree(process)
-        finally:
+            process.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            timed_out = True
             try:
-                # communicate keeps the output read before the timeout.
-                raw, _ = process.communicate(timeout=_DRAIN_TIMEOUT_S)
-            except subprocess.TimeoutExpired:
-                # An orphan still holds the pipe; give up on the rest.
-                process.kill()
-                raw = b""
-    output = raw.decode("utf-8", errors="replace")
+                _kill_tree(process)
+            finally:
+                process.wait(timeout=_DRAIN_TIMEOUT_S)
+    output = out_path.read_bytes().decode("utf-8", errors="replace")
     return ReplayResult(
         exit_code=None if timed_out else process.returncode,
         timed_out=timed_out,

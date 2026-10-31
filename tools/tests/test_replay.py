@@ -151,6 +151,42 @@ def test_timeout_kills_the_whole_process_tree(tmp_path: Path) -> None:
     assert not alive
 
 
+def test_descendant_holding_stdout_does_not_block_or_blank_the_result(tmp_path: Path) -> None:
+    pid_file = tmp_path / "grandchild.pid"
+    script = write_script(
+        tmp_path,
+        f"""\
+        import subprocess
+        import sys
+
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"]
+        )
+        with open({str(pid_file)!r}, "w") as handle:
+            handle.write(str(child.pid))
+        print("marker-before-exit", flush=True)
+        """,
+    )
+    started = time.monotonic()
+    try:
+        result = replay(script, python=PYTHON, timeout_s=60)
+        elapsed = time.monotonic() - started
+    finally:
+        # Don't leak the sleeper (it outlives the script by design).
+        if pid_file.exists():
+            pid = pid_file.read_text(encoding="utf-8")
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", pid], check=False, capture_output=True
+                )
+            else:
+                subprocess.run(["kill", "-9", pid], check=False, capture_output=True)
+    assert result.exit_code == 0
+    assert result.timed_out is False
+    assert "marker-before-exit" in result.output
+    assert elapsed < 10
+
+
 def test_replay_runs_in_a_temp_copy_and_leaves_the_original_directory_alone(
     tmp_path: Path,
 ) -> None:
