@@ -1,7 +1,7 @@
 # grader-01 — global script-fix rubric + grader v0 (design proposal)
 
-**Status:** DESIGN — awaiting the CD's answers to § Decisions for the CD.
-Not an oversee-ready plan: once approved, each phase in § Phases becomes one
+**Status:** APPROVED 2026-10-30 (the CD's answers: § Decisions).
+Not an oversee-ready plan: each phase in § Phases becomes one
 (`.claude/templates/plan.md`), one at a time.
 **Requested:** 2026-10-30 (TODO.md § Needs Zack, "Global rubric + graders").
 **Scope:** new `rubrics/script-fix/`, `tools/scriptfix/`, three root
@@ -70,8 +70,10 @@ A trial scores 100 when all four checks hold; otherwise 0.
    - the same navigations, actions and transaction markers, in the same
      order and of the same kind (a `click` stays a `click`);
    - every assertion the reference has, between the same actions and with
-     the same matcher (`to_be_visible` stays `to_be_visible`); an added
-     assertion is allowed (smell `extra-assertion`);
+     the same matcher (`to_be_visible` stays `to_be_visible`). Added
+     assertions are welcome (tag `added-assertion`, for the record): one
+     that waits for a progressively loaded element makes the script
+     sturdier, and a wrong one fails the replay;
    - a locator or value that differs from the reference's still targets
      what the reference targets (judged).
 3. **No fake fix.** None of the fake-fix patterns below, beyond what the
@@ -122,7 +124,6 @@ unless the CD promotes it).
 | A locator or expected value that differs from the reference's | judge |
 | A regex or pattern that matches almost anything (`.*`, `""`) | judge |
 | `.first`, `.last` or `.nth()` added | smell |
-| An added assertion | smell |
 
 ### Not graded in v0
 
@@ -156,7 +157,8 @@ Every graded trial gets tags; every `fail` gets at least one.
 | Fake fix | `swallowed-error` · `sleep` · `longer-timeout` · `force` · `conditional-step` · `forced-exit` · `new-wait` · `changed-setup` · `broad-pattern` |
 | Fair play | `answer-key` · `repo-online` |
 | Escalate cases | `missed-escalation` (plus `retargeted`) |
-| Smells (no effect) | `first-nth` · `extra-assertion` · `tried-to-run` |
+| Smells (no effect) | `first-nth` · `tried-to-run` |
+| Info (no effect) | `added-assertion` |
 | Invalid | `site-changed` · `harness-error` |
 
 Cases carry **issue types** instead (in `case.toml`), so pass rates can be
@@ -330,7 +332,7 @@ pilot.
 **Replays and the load-test pin.** Grading replays are single replays, one
 at a time, deduplicated. The pilot needs fewer than 100 on playwright.dev
 in total (controls plus distinct fixes). Full runs at suite scale need many
-more, so they should wait for a local copy of the target site, which also
+more, so they wait for the local test site (TODO.md § Next), which also
 stops site changes from invalidating batches.
 
 ## Pilot
@@ -386,7 +388,7 @@ and the lower bound.
 - the CD spot-checks 10 random verdicts (passes and fails) and agrees with
   every one.
 
-## Tooling layout (ADR-0001 on approval)
+## Tooling layout (ADR-0001)
 
 ```
 rubrics/script-fix/       rubric-v0.md · prompt.md · judge/ (judge prompts)
@@ -429,38 +431,35 @@ C and D are independent of each other once B lands. § Next's eval-integrity
 gate gains two checks: `case.toml` is valid, and `prompt.md` matches the
 shared prompt.
 
-## Decisions for the CD
+## Decisions (CD, 2026-10-30)
 
-Each has a recommendation; "all as recommended" is a complete answer.
+All nine as recommended, with one change to the first:
 
 1. **The journey is the reference's.** The fix is compared with the
-   reference fix; an added assertion is a smell; any other added, removed
-   or reordered step is a zero. *Recommended.*
-2. **`.first` / `.nth()`:** a smell in v0 (alternative: a zero).
-   *Recommended: smell, revisited with pilot data.*
+   reference fix; any added, removed or reordered navigation or action, or
+   a removed or weakened assertion, is a zero. **Changed:** added
+   assertions are welcome, not a smell. The CD prefers more assertions
+   (e.g. waits on progressively loaded elements), and an incorrect one
+   should break the next transaction, i.e. fail the replay.
+2. **`.first` / `.nth()`:** a smell in v0, revisited with pilot data.
 3. **The shared prompt** above, including "Don't run the script" and the
    escalation sentence. Running stays blocked by the harness; attempts are
-   a smell. *Recommended.*
-4. **No report grading in fix cases** (Eval 01's run 4 would score 100).
-   *Recommended.*
-5. **Escalate cases in v0,** with case 06 in the pilot. *Recommended.*
+   a smell.
+4. **No report grading in fix cases** (Eval 01's run 4 scores 100).
+5. **Escalate cases in v0,** with case 06 in the pilot.
 6. **Stages and bar:** smoke 1 · screen 10 · full 100, stopping at the 6th
    failure; bar ≥95/100 with the lower bound shown; a screen failure
    triggers a full run; a regression needs two failed full runs.
-   *Recommended.*
 7. **Site policy:** pilot replays are sequential, deduplicated single
-   replays on playwright.dev (fewer than 100 in all); full runs beyond the
-   one optional pilot run wait for a local copy of the site.
-   *Recommended; please confirm this stays within the load-test pin's
-   "single replays".*
-8. **Judge:** Sonnet 5.5 via `claude -p`, cached; `unsure` goes to you.
-   *Recommended.*
+   replays on playwright.dev (fewer than 100 in all), within the
+   load-test pin; the one optional pilot full run is fine. Further full
+   runs wait for the CD's local test site (TODO.md § Next).
+8. **Judge:** Sonnet 5.5 via `claude -p`, cached; `unsure` goes to the CD.
 9. **Layout** as in § Tooling layout, recorded as ADR-0001.
-   *Recommended.*
 
 ## Deferred to v1
 
-- **A timing case,** on a local target.
+- **A timing case,** on the local test site (TODO.md § Next).
 - **A deterministic same-target check:** compare the element each step hit
   in the reference's replay trace with the one in the fix's. It would
   replace most judge calls.
