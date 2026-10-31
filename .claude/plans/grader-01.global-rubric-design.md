@@ -344,7 +344,8 @@ logs) and compare with the hand grades:
 
 | Runs | Hand grade | v0 must say |
 |---|---|---|
-| 1–3, 5, 6 | Fixed 0 | `fail`, `not-fixed` |
+| 1 | Fixed 0 | `fail`, `not-fixed` (still fails at line 18) |
+| 2, 3, 5, 6 | Fixed 0 | `fail`, `new-failure` (fails at line 20, the hidden defect) |
 | 4, 11 | Fixed 40 | `pass` |
 | 10, 12 | Fixed 40, regex locators | `pass`, once the judge clears the changed locators |
 | 7–9 | not scored | `invalid`, `harness-error` |
