@@ -118,7 +118,7 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
         (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
         (ADR-0001)
-  - [ ] `.claude/standards/testing.md` — test/check runner; test directory
+  - [x] `.claude/standards/testing.md` — test/check runner; test directory (grader-01b)
   - [ ] `.claude/standards/review.md` — static-reviewer version/API pins
   - [ ] `.claude/agents/README.md` — specialist agents table; anticipated
         agents
