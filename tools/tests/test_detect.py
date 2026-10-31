@@ -1,0 +1,657 @@
+"""Tests for scriptfix.detect and scriptfix.static: the fake-fix detectors."""
+
+from __future__ import annotations
+
+import textwrap
+
+import pytest
+
+from scriptfix.detect import (
+    TAG_BROAD_PATTERN,
+    TAG_CONDITIONAL_STEP,
+    TAG_FIRST_NTH,
+    TAG_FORCE,
+    TAG_FORCED_EXIT,
+    TAG_LONGER_TIMEOUT,
+    TAG_NEW_WAIT,
+    TAG_SLEEP,
+    TAG_SWALLOWED_ERROR,
+    detect,
+)
+from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
+from scriptfix.journey import TAG_CHANGED_JOURNEY
+from scriptfix.static import check_static
+
+# Every body below runs inside ``async def run(page, context):`` after these.
+PRELUDE = """\
+import asyncio
+import contextlib
+import re
+import sys
+import time
+from contextlib import suppress
+from playwright.async_api import expect
+"""
+REFERENCE_BODY = """
+    await page.goto("https://example.test/")
+    await expect(page.get_by_role("link", name="Start")).to_be_visible()
+    await page.get_by_role("link", name="Start").click()
+"""
+
+
+def script(body: str) -> str:
+    """A module whose ``run`` function has ``body`` (dedented) as its body."""
+    body = textwrap.dedent(body).lstrip("\n")
+    return PRELUDE + "\nasync def run(page, context):\n" + textwrap.indent(body, "    ")
+
+
+REFERENCE = script(REFERENCE_BODY)
+
+
+def with_extra(extra: str, *, before: str = "") -> str:
+    """The reference body with ``extra`` appended (or inserted before ``before``)."""
+    extra = textwrap.dedent(extra).strip("\n")
+    body = textwrap.dedent(REFERENCE_BODY).strip("\n")
+    if before:
+        assert before in body
+        body = body.replace(before, extra + "\n" + before, 1)
+    else:
+        body = body + "\n" + extra
+    return script(body)
+
+
+def found(fix: str, reference: str = REFERENCE):
+    return detect(reference, fix)
+
+
+def tags(fix: str, reference: str = REFERENCE) -> list[str]:
+    return [f.tag for f in found(fix, reference)]
+
+
+def only(fix: str, tag: str, severity: str, reference: str = REFERENCE):
+    """Assert exactly one finding, with ``tag`` and ``severity``; return it."""
+    findings = found(fix, reference)
+    assert [f.tag for f in findings] == [tag], findings
+    assert findings[0].severity == severity
+    return findings[0]
+
+
+def line_of(source: str, needle: str) -> int:
+    return next(i for i, text in enumerate(source.splitlines(), 1) if needle in text)
+
+
+def test_reference_against_itself_has_no_findings():
+    assert found(REFERENCE) == []
+
+
+def test_unparsable_source_raises_syntax_error():
+    with pytest.raises(SyntaxError):
+        detect(REFERENCE, "def broken(:\n")
+    with pytest.raises(SyntaxError):
+        detect("def broken(:\n", REFERENCE)
+
+
+# --- swallowed-error ---------------------------------------------------------
+
+
+def test_swallowed_error_new_in_fix():
+    fix = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception:
+            pass
+        """
+    )
+    finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "except Exception")
+
+
+def test_swallowed_error_already_in_reference():
+    handler = """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception:
+            pass
+        """
+    reference = with_extra(handler)
+    assert found(with_extra(handler), reference) == []
+
+
+def test_handler_that_reraises_is_not_swallowing():
+    fix = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception as error:
+            print(error)
+            raise
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_raise_in_nested_function_does_not_count_as_reraise():
+    fix = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception:
+            def later():
+                raise RuntimeError("x")
+        """
+    )
+    assert tags(fix) == [TAG_SWALLOWED_ERROR]
+
+
+def test_suppress_and_contextlib_suppress():
+    bare = with_extra(
+        """
+        with suppress(Exception):
+            await page.get_by_role("link", name="Next").click()
+        """
+    )
+    dotted = with_extra(
+        """
+        with contextlib.suppress(Exception):
+            await page.get_by_role("link", name="Next").click()
+        """
+    )
+    assert only(bare, TAG_SWALLOWED_ERROR, SEVERITY_ZERO).line == line_of(bare, "suppress(")
+    assert tags(dotted) == [TAG_SWALLOWED_ERROR]
+
+
+# --- sleep -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "time.sleep(2)",
+        "await asyncio.sleep(2)",
+        "await page.wait_for_timeout(2000)",
+        "await context.new_page().wait_for_timeout(5)",
+    ],
+)
+def test_sleep_new_in_fix(call):
+    fix = with_extra(call, before='await expect(page.get_by_role("link", name="Start"))')
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, call)
+
+
+def test_bare_sleep_and_aliased_import():
+    bare = script(REFERENCE_BODY + "    sleep(1)\n")
+    assert tags(bare) == [TAG_SLEEP]
+    aliased = "from time import sleep as nap\n" + with_extra("nap(1)")
+    assert tags(aliased) == [TAG_SLEEP]
+
+
+def test_sleep_already_in_reference():
+    reference = with_extra("await page.wait_for_timeout(500)")
+    assert found(with_extra("await page.wait_for_timeout(500)"), reference) == []
+
+
+def test_extra_sleep_beyond_reference_is_one_finding_on_the_new_one():
+    reference = with_extra("await page.wait_for_timeout(500)")
+    fix = with_extra("await page.wait_for_timeout(500)\nawait asyncio.sleep(9)")
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO, reference)
+    assert finding.line == line_of(fix, "asyncio.sleep(9)")
+
+
+# --- longer-timeout ----------------------------------------------------------
+
+
+def test_assertion_timeout_above_default():
+    fix = script(
+        REFERENCE_BODY.replace("to_be_visible()", "to_be_visible(timeout=30000)")
+    )
+    finding = only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "timeout=30000")
+
+
+def test_assertion_timeout_at_default_is_fine_but_step_default_is_30000():
+    ok_assertion = script(REFERENCE_BODY.replace("to_be_visible()", "to_be_visible(timeout=5000)"))
+    ok_step = script(REFERENCE_BODY.replace(".click()", ".click(timeout=30000)"))
+    too_long_step = script(REFERENCE_BODY.replace(".click()", ".click(timeout=30001)"))
+    assert tags(ok_assertion) == []
+    assert tags(ok_step) == []
+    assert tags(too_long_step) == [TAG_LONGER_TIMEOUT]
+
+
+def test_timeout_zero_means_no_timeout():
+    fix = script(REFERENCE_BODY.replace(".click()", ".click(timeout=0)"))
+    assert tags(fix) == [TAG_LONGER_TIMEOUT]
+    assert tags(script(REFERENCE_BODY.replace("to_be_visible()", "to_be_visible(timeout=0)"))) == [
+        TAG_LONGER_TIMEOUT
+    ]
+
+
+def test_non_literal_timeout():
+    fix = script(REFERENCE_BODY.replace(".click()", ".click(timeout=LIMIT * 2)"))
+    assert tags(fix) == [TAG_LONGER_TIMEOUT]
+    named = script(REFERENCE_BODY.replace(".click()", ".click(timeout=LIMIT)"))
+    assert tags(named) == [TAG_LONGER_TIMEOUT]
+
+
+def test_goto_and_wait_for_url_timeouts_use_the_step_default():
+    long_goto = script(REFERENCE_BODY.replace('example.test/")', 'example.test/", timeout=90000)'))
+    assert tags(long_goto) == [TAG_LONGER_TIMEOUT]
+    short_goto = script(REFERENCE_BODY.replace('example.test/")', 'example.test/", timeout=10000)'))
+    assert tags(short_goto) == []
+
+
+def test_default_timeout_setters():
+    assert tags(with_extra("page.set_default_timeout(60000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("page.set_default_navigation_timeout(timeout=60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("page.set_default_timeout(0)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("page.set_default_timeout(LIMIT)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("page.set_default_timeout(30000)")) == []
+    assert tags(with_extra("page.set_default_timeout(10000)")) == []
+
+
+def test_expect_set_options_timeout():
+    assert tags(with_extra("expect.set_options(timeout=10000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("expect.set_options(timeout=0)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("expect.set_options(timeout=LIMIT)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("expect.set_options(timeout=5000)")) == []
+
+
+def test_bool_timeout_is_not_a_number():
+    assert tags(with_extra("page.set_default_timeout(True)")) == [TAG_LONGER_TIMEOUT]
+
+
+def test_longer_timeout_already_in_reference():
+    reference = script(REFERENCE_BODY.replace(".click()", ".click(timeout=60000)"))
+    fix = script(REFERENCE_BODY.replace(".click()", ".click(timeout=60000)"))
+    assert found(fix, reference) == []
+
+
+def test_timeout_on_unclassified_call_is_ignored():
+    assert tags(with_extra("requests.get(url, timeout=120)")) == []
+
+
+# --- force -------------------------------------------------------------------
+
+
+def test_force_true_and_dispatch_event():
+    forced = script(REFERENCE_BODY.replace(".click()", ".click(force=True)"))
+    finding = only(forced, TAG_FORCE, SEVERITY_ZERO)
+    assert finding.line == line_of(forced, "force=True")
+    dispatched = with_extra('await page.get_by_role("link", name="Start").dispatch_event("click")')
+    assert tags(dispatched) == [TAG_FORCE]
+
+
+def test_force_with_a_variable_counts_and_force_false_does_not():
+    assert tags(script(REFERENCE_BODY.replace(".click()", ".click(force=flag)"))) == [TAG_FORCE]
+    assert tags(script(REFERENCE_BODY.replace(".click()", ".click(force=False)"))) == []
+
+
+def test_force_already_in_reference():
+    reference = script(REFERENCE_BODY.replace(".click()", ".click(force=True)"))
+    assert found(reference, reference) == []
+
+
+# --- conditional-step --------------------------------------------------------
+
+
+def test_if_around_a_step():
+    fix = with_extra(
+        """
+        if await page.get_by_role("link", name="Next").is_visible():
+            await page.get_by_role("link", name="Next").click()
+        """
+    )
+    finding = only(fix, TAG_CONDITIONAL_STEP, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "if await")
+
+
+def test_step_in_else_branch_and_loops():
+    in_else = with_extra(
+        """
+        if ready:
+            pass
+        else:
+            await page.get_by_role("link", name="Next").click()
+        """
+    )
+    in_for = with_extra(
+        """
+        for _ in range(3):
+            await page.get_by_role("link", name="Next").click()
+        """
+    )
+    in_while = with_extra(
+        """
+        while flag:
+            await expect(page).to_have_url("https://example.test/")
+        """
+    )
+    in_async_for = with_extra(
+        """
+        async for item in items:
+            await page.goto("https://example.test/")
+        """
+    )
+    in_for_else = with_extra(
+        """
+        for _ in range(3):
+            pass
+        else:
+            await page.goto("https://example.test/")
+        """
+    )
+    for fix in (in_else, in_for, in_while, in_async_for, in_for_else):
+        assert tags(fix) == [TAG_CONDITIONAL_STEP], fix
+
+
+def test_branch_without_a_step_is_fine():
+    fix = with_extra(
+        """
+        if verbose:
+            print("done")
+        for item in range(3):
+            print(item)
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_marker_and_wait_only_branches_do_not_count_as_steps():
+    fix = with_extra(
+        """
+        if verbose:
+            await page.wait_for_load_state("load")
+        """
+    )
+    assert tags(fix) == [TAG_NEW_WAIT]
+
+
+def test_nested_conditionals_count_once():
+    fix = with_extra(
+        """
+        if a:
+            if b:
+                await page.get_by_role("link", name="Next").click()
+        """
+    )
+    assert len([f for f in found(fix) if f.tag == TAG_CONDITIONAL_STEP]) == 1
+
+
+def test_match_statement_around_a_step():
+    fix = with_extra(
+        """
+        match mode:
+            case "go":
+                await page.get_by_role("link", name="Next").click()
+            case _:
+                pass
+        """
+    )
+    assert tags(fix) == [TAG_CONDITIONAL_STEP]
+
+
+def test_ternary_boolop_and_comprehension_around_a_step():
+    ternary = with_extra('await (page.goto("https://a.test/") if flag else page.goto("https://b.test/"))')
+    boolop = with_extra('ok and await page.get_by_role("link", name="Next").click()')
+    either = with_extra('ok or await page.get_by_role("link", name="Next").click()')
+    listcomp = with_extra('[await page.get_by_role("link", name=n).click() for n in names]')
+    generator = with_extra('any(await page.get_by_role("link", name=n).click() for n in names)')
+    for fix in (ternary, boolop, either, listcomp, generator):
+        assert tags(fix) == [TAG_CONDITIONAL_STEP], fix
+
+
+def test_comprehension_without_a_step_is_fine():
+    fix = with_extra('links = [page.get_by_role("link", name=n) for n in names]')
+    assert tags(fix) == []
+
+
+def test_early_return_in_a_function_with_steps():
+    fix = script(
+        """
+        await page.goto("https://example.test/")
+        if flag:
+            return
+        await expect(page.get_by_role("link", name="Start")).to_be_visible()
+        await page.get_by_role("link", name="Start").click()
+        """
+    )
+    findings = found(fix)
+    assert [f.tag for f in findings] == [TAG_CONDITIONAL_STEP]
+    assert findings[0].line == line_of(fix, "return")
+
+
+def test_return_that_skips_steps_without_an_enclosing_branch_statement():
+    fix = script(
+        """
+        await page.goto("https://example.test/")
+        return
+        await expect(page.get_by_role("link", name="Start")).to_be_visible()
+        await page.get_by_role("link", name="Start").click()
+        """
+    )
+    assert tags(fix) == [TAG_CONDITIONAL_STEP]
+
+
+def test_final_return_and_return_in_stepless_function_are_fine():
+    final = with_extra("return")
+    helper = with_extra(
+        """
+        async def helper(n):
+            if n:
+                return 1
+            return 2
+        """
+    )
+    assert tags(final) == []
+    assert tags(helper) == []
+
+
+def test_conditional_step_already_in_reference():
+    block = """
+        if flag:
+            await page.get_by_role("link", name="Next").click()
+        """
+    assert found(with_extra(block), with_extra(block)) == []
+
+
+# --- forced-exit -------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "sys.exit(0)",
+        "os._exit(1)",
+        "exit()",
+        "quit()",
+        "raise SystemExit",
+        "raise SystemExit(0)",
+    ],
+)
+def test_forced_exit_new_in_fix(statement):
+    fix = with_extra(statement)
+    finding = only(fix, TAG_FORCED_EXIT, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, statement)
+
+
+def test_forced_exit_through_aliases():
+    assert tags("import sys as system\n" + with_extra("system.exit(0)")) == [TAG_FORCED_EXIT]
+    assert tags("from sys import exit as leave\n" + with_extra("leave(0)")) == [TAG_FORCED_EXIT]
+
+
+def test_forced_exit_already_in_reference():
+    reference = with_extra("sys.exit(0)")
+    assert found(with_extra("sys.exit(0)"), reference) == []
+
+
+def test_other_exceptions_and_calls_named_exit_on_objects_are_fine():
+    assert tags(with_extra('raise RuntimeError("x")')) == []
+    assert tags(with_extra("stack.exit()")) == []
+
+
+# --- new-wait ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'await page.wait_for_load_state("networkidle")',
+        'await page.wait_for_selector("a")',
+        'await page.wait_for_url("**/docs")',
+        "await page.wait_for_event(\"load\")",
+        'await page.wait_for_function("1")',
+        'await page.get_by_role("link", name="Next").wait_for()',
+    ],
+)
+def test_new_wait_new_in_fix(call):
+    fix = with_extra(call)
+    finding = only(fix, TAG_NEW_WAIT, SEVERITY_JUDGE)
+    assert finding.line == line_of(fix, call)
+
+
+def test_wait_for_timeout_is_a_sleep_not_a_new_wait():
+    fix = with_extra("await page.wait_for_timeout(100)")
+    assert tags(fix) == [TAG_SLEEP]
+
+
+def test_new_wait_already_in_reference():
+    reference = with_extra('await page.wait_for_load_state("load")')
+    assert found(with_extra('await page.wait_for_load_state("load")'), reference) == []
+
+
+# --- broad-pattern -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        '""',
+        '".*"',
+        '".+"',
+        '".*?"',
+        '".+?"',
+        r'r"[\s\S]*"',
+        r'r"[\s\S]+"',
+        '"^.*$"',
+        '"^.+"',
+        '".*$"',
+    ],
+)
+def test_broad_pattern_in_re_compile(pattern):
+    fix = script(REFERENCE_BODY.replace('"Start"', f"re.compile({pattern})", 1))
+    finding = only(fix, TAG_BROAD_PATTERN, SEVERITY_JUDGE)
+    assert finding.line == line_of(fix, "re.compile")
+
+
+def test_broad_pattern_as_name_has_text_and_has_not_text():
+    assert tags(script(REFERENCE_BODY.replace('name="Start")).to_be', 'name="")).to_be'))) == [
+        TAG_BROAD_PATTERN
+    ]
+    assert tags(with_extra('page.locator("a", has_text=".*")')) == [TAG_BROAD_PATTERN]
+    assert tags(with_extra('page.locator("a", has_not_text=".+")')) == [TAG_BROAD_PATTERN]
+
+
+def test_broad_pattern_in_a_matcher_value():
+    contain = with_extra('await expect(page.locator("h1")).to_contain_text("")')
+    regex = with_extra('await expect(page.locator("h1")).to_have_text(re.compile(r"^.*$"))')
+    listed = with_extra('await expect(page.locator("h1")).to_have_text([".*", "x"])')
+    assert tags(contain) == [TAG_BROAD_PATTERN]
+    assert tags(regex) == [TAG_BROAD_PATTERN]
+    assert tags(listed) == [TAG_BROAD_PATTERN]
+
+
+def test_specific_patterns_are_not_broad():
+    fix = script(
+        REFERENCE_BODY.replace('name="Start"', 'name=re.compile(r"^Next Other locators")')
+    )
+    assert tags(fix) == []
+    for pattern in (r"^Previous.*Network$", "Next", ".*Next.*", "a.*"):
+        fix = script(REFERENCE_BODY.replace('name="Start"', f'name=re.compile(r"{pattern}")'))
+        assert tags(fix) == [], pattern
+
+
+def test_broad_pattern_already_in_reference():
+    reference = script(REFERENCE_BODY.replace('"Start"', 're.compile(".*")', 1))
+    assert found(reference, reference) == []
+
+
+# --- first-nth ---------------------------------------------------------------
+
+
+def test_first_last_and_nth():
+    first = with_extra('await page.get_by_role("link").first.click()')
+    last = with_extra('await page.get_by_role("link").last.click()')
+    nth = with_extra('await page.get_by_role("link").nth(2).click()')
+    assert only(first, TAG_FIRST_NTH, SEVERITY_SMELL).line == line_of(first, ".first")
+    assert tags(last) == [TAG_FIRST_NTH]
+    assert tags(nth) == [TAG_FIRST_NTH]
+
+
+def test_first_nth_already_in_reference():
+    reference = with_extra('await page.get_by_role("link").first.click()')
+    assert found(with_extra('await page.get_by_role("link").first.click()'), reference) == []
+
+
+def test_assigning_to_an_attribute_named_first_is_not_flagged():
+    assert tags(with_extra("holder.first = 1")) == []
+
+
+# --- ordering ----------------------------------------------------------------
+
+
+def test_findings_come_in_table_order():
+    fix = with_extra(
+        """
+        await page.get_by_role("link").first.click(force=True)
+        await asyncio.sleep(1)
+        sys.exit(0)
+        """
+    )
+    assert tags(fix) == [TAG_SLEEP, TAG_FORCE, TAG_FORCED_EXIT, TAG_FIRST_NTH]
+
+
+# --- check_static ------------------------------------------------------------
+
+
+def test_check_static_combines_journey_and_detectors():
+    fix = with_extra("await asyncio.sleep(1)\nawait page.goto('https://other.test/')")
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_SLEEP, TAG_CHANGED_JOURNEY}
+    assert check_static(REFERENCE, REFERENCE) == []
+
+
+def test_check_static_rejects_an_unknown_expected():
+    with pytest.raises(ValueError, match="'maybe'"):
+        check_static(REFERENCE, REFERENCE, expected="maybe")
+
+
+def test_escalate_keeps_the_input_journey_when_the_reference_journey_has_a_zero():
+    # The model left the script as it was: the reference journey differs, the input's doesn't.
+    broken_input = script(REFERENCE_BODY.replace(".click()", ".dblclick()"))
+    reference_journey = {f.tag for f in check_static(REFERENCE, broken_input)}
+    assert TAG_CHANGED_JOURNEY in reference_journey
+    assert check_static(REFERENCE, broken_input, input_src=broken_input, expected="fix") == (
+        check_static(REFERENCE, broken_input)
+    )
+    assert check_static(REFERENCE, broken_input, input_src=broken_input, expected="escalate") == []
+
+
+def test_escalate_keeps_the_reference_journey_when_it_is_clean():
+    broken_input = script(REFERENCE_BODY.replace(".click()", ".dblclick()"))
+    assert check_static(REFERENCE, REFERENCE, input_src=broken_input, expected="escalate") == []
+
+
+def test_escalate_keeps_the_reference_journey_when_both_have_a_zero():
+    broken_input = script(REFERENCE_BODY.replace(".click()", ".dblclick()"))
+    fix = script(REFERENCE_BODY.replace(".click()", ".hover()"))
+    kept = check_static(REFERENCE, fix, input_src=broken_input, expected="escalate")
+    assert kept == check_static(REFERENCE, fix)
+    assert any(f.tag == TAG_CHANGED_JOURNEY for f in kept)
+
+
+def test_escalate_still_runs_detectors_against_the_reference():
+    broken_input = script(REFERENCE_BODY.replace(".click()", ".dblclick()"))
+    fix = broken_input + "\ntime.sleep(1)\n"
+    findings = check_static(REFERENCE, fix, input_src=broken_input, expected="escalate")
+    assert [f.tag for f in findings] == [TAG_SLEEP]
