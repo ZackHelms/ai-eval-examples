@@ -37,6 +37,13 @@ Python/Playwright(/Locust) fixtures, pwsh repo scripts.
     `Get-Help`. Reference: `01-setup-env.ps1`.
   - **Python:** `argparse` (it provides `-h`/`--help` and rejects unknown
     arguments by default); put the usage text in `description`/`help=`.
+- **pwsh child scopes:** inside `& { … }`, `$PSBoundParameters` is the
+  scriptblock's own (empty) dictionary, not the script's, so read it at
+  script scope first (`30-grade-trials.ps1` dropped `-Timeout` this way).
+  Don't pipe a native command into `Out-Host` to keep its output out of a
+  captured result: pwsh re-decodes the bytes through the console code page
+  and breaks UTF-8 (`»`). Run it unpiped and keep `$LASTEXITCODE` in a
+  `$script:` variable.
 
 ## Platform pins (the static reviewer flags these)
 

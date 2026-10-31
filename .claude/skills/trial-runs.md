@@ -65,15 +65,27 @@ can't run the script or fetch the web: that's the subject's tool profile
 
 ## Grading replays
 
-- Replay a copy in `%TEMP%`, never in the repo or the trial folder (the
-  script writes its trace next to itself). Run the reference first as a
-  control: if it fails, the site changed, so don't grade.
+- Grade with `.\30-grade-trials.ps1 -Case evals\<slug> -Runs 3-12` (add
+  `-Tools interactive` for interactive runs); `-Report` prints pass rates.
+  It replays the reference and the input as controls before and after the
+  batch, replays each distinct fix once, and records `grading/trials.jsonl`
+  and `grading/fixes/`. If a control fails, it records nothing. Eval 01's
+  calibration took 14 replays for 12 runs. `python -m scriptfix` itself
+  needs `PYTHONPATH=tools`; the script sets it.
+- It replays a copy in `%TEMP%\scriptfix\<hash>\`, never in the repo or the
+  trial folder (the script writes its trace next to itself).
 - `python -X utf8 script.py`. `python -I` ignores `PYTHONUTF8`, and a
   cp1252 console write crashes on `»`.
 - One replay at a time; public sites get single replays only (CLAUDE.md
   § Project pins).
 - Eval 01's script launches `headless=False`, so browser windows open.
   Don't change the script to stop them.
+- **Windows processes:** capture a replay's output through a file, not a
+  pipe: Playwright's driver inherits the parent's stderr, so a leftover
+  process can hold a pipe open after the script exits. Kill a timed-out
+  replay with `taskkill /T /F /PID`, or its browser outlives it. Never
+  probe a Windows process with `os.kill(pid, 0)`: it terminates the
+  process instead.
 
 ## Windows file gotchas
 
