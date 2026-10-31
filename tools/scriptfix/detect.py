@@ -182,7 +182,12 @@ def _kwarg(call: ast.Call, name: str) -> ast.keyword | None:
 
 
 def _has_raise(handler: ast.ExceptHandler) -> bool:
-    return any(isinstance(n, ast.Raise) for n in _own_nodes(handler.body))
+    """True when a ``raise`` is one of the handler body's own top-level statements.
+
+    A raise nested in an ``if``/loop/``with``/``try``/``match`` only re-raises
+    some errors and swallows the rest, so it doesn't count.
+    """
+    return any(isinstance(statement, ast.Raise) for statement in handler.body)
 
 
 def _swallowed_errors(module: _Module) -> list[_Hit]:

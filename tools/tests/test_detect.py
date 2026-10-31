@@ -131,6 +131,42 @@ def test_handler_that_reraises_is_not_swallowing():
     assert tags(fix) == []
 
 
+def test_conditional_reraise_still_swallows():
+    fix = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception as error:
+            if "timeout" in str(error):
+                raise
+        """
+    )
+    finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "except Exception")
+
+
+def test_reraise_after_other_statements_and_raise_from():
+    after_log = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception as error:
+            log(error)
+            raise
+        """
+    )
+    raise_from = with_extra(
+        """
+        try:
+            await page.get_by_role("link", name="Next").click()
+        except Exception as error:
+            raise RuntimeError("x") from error
+        """
+    )
+    assert tags(after_log) == []
+    assert tags(raise_from) == []
+
+
 def test_raise_in_nested_function_does_not_count_as_reraise():
     fix = with_extra(
         """
