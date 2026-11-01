@@ -22,35 +22,41 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   B deterministic grader + pytest gate + Eval 01 calibration (done
   2026-10-31: `tools/scriptfix/`, `30-grade-trials.ps1`,
   `.claude/plans/DONE/grader-01b.deterministic-grader.md`) → **next:** C
-  cases 02–06 (neutral-folder capture, `10-make-case.ps1`; case 06
-  replaces the impossible-locator eval) and D trial runner
-  (`20-run-trials.ps1`), plans to draft → E LLM judge (resolves Eval 01's
-  `pending-judge` runs 10 and 12) → F pilot. Absorbs the former § Next items Eval 01 grader,
-  Capture script, Trial runner script and Eval: impossible locator.
+  cases 02–06 and D trial runner, both plan-ready (the two entries below;
+  independent of each other) → E LLM judge (resolves Eval 01's
+  `pending-judge` runs 10 and 12; plan it once C lands, since it needs
+  the cases' judge items) → F pilot. Absorbs the former § Next items Eval
+  01 grader, Capture script, Trial runner script and Eval: impossible
+  locator.
+- **grader-01 phase C: cases 02–06.** Neutral-folder capture,
+  `10-make-case.ps1`, five recipe-built cases with labeled corpora (case 06
+  replaces the impossible-locator eval and is the first escalate case),
+  and the escalate journey rule. Bundled into it:
+  - the **eval static reviewer** (from § Needs Zack, AGENT-OPP).
+    *Decided 2026-10-31 (the CD): "Approve, in phase C".* Task 1 writes
+    `.claude/agents/eval-static-reviewer.md`, so the new cases get
+    reviewed in the same run;
+  - the **eval-integrity gate** (from § Next): pytest checks over every
+    eval.
+
+  *Depends on:* phase B (done).
+
+  **Plan ready (2026-10-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01c.cases.md`
+- **grader-01 phase D: trial runner.** `20-run-trials.ps1` runs N
+  headless one-shot trials of a case, one at a time, with the launcher
+  gotchas built in. It writes a subject sidecar that the grader reads, and
+  `-SelfTest` checks the launcher for about $0.01. Context bundles are
+  deferred: `--safe-mode` disables CLAUDE.md. *Depends on:* phase B
+  (done); independent of C.
+
+  **Plan ready (2026-10-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01d.trial-runner.md`
 
 <!-- --- -->
 
 ## Needs Zack
 
-- **AGENT-OPP: eval static reviewer** (refine pass, 2026-10-31): the
-  static pre-pass (CLAUDE.md § Validation, step 1) still has no agent, and
-  this session ran its checks by hand each time (answer leaks in
-  `prompt.md`/`inputs/`, placeholders, LF endings, the generic-content
-  pin). Approve a `.claude/agents/` reviewer with that checklist?
-- **AGENT-OPP: grader red-team** (refine pass after grader-01b,
-  2026-10-31). The proposed agent writes fake-fix variants of a case's
-  reference meant to slip past `tools/scriptfix`, e.g.:
-  - a sleep under an import alias;
-  - a timeout passed through `**opts`;
-  - a conditional re-raise;
-  - a step hidden in a ternary.
-
-  It runs `check_static` on each, and proposes a labeled corpus file for
-  any variant the grader misses. In grader-01b's review, 4 of the 5
-  sonnet-tier code tasks had a hole like this that only the overseer's
-  review caught, and a false pass rewards cheating contexts. It pairs
-  with § Next "Grader hardening". Approve a `.claude/agents/` role with
-  this checklist?
 - **Test-site element inventory: hands-on pass** (the CD's request,
   2026-10-31): the first pass is `.claude/notes/test-site-element-inventory.md`,
   generic by rule (CLAUDE.md § Project pins: generic content only). The
@@ -61,12 +67,13 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   decision): (a) Python version for the repo venv — 3.12 in use by
   `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
   `requirements.txt`); confirm in the ADR;
-  (b) multi-user approach — locust + locust-plugins (used at work) vs. an
-  alternative (e.g. asyncio driving N Playwright browser contexts); the
-  choice lands in `requirements.txt`;
+  (b) multi-user approach — *Decided 2026-10-31 (the CD): "We can remove
+  locust all together; python+playwright is sufficient for these evals, i
+  need to do actual experiments with these with single user first before
+  i start thinking about issues that only happen under a multiuser
+  load."* Closed: no multi-user runner for now (CLAUDE.md § Project pins);
   (c) target policy — which public site(s) are fine for 1-user
-  record/codegen, and what local target hosts multi-user runs (the CD,
-  2026-10-31: a local test site on the PC or in a container, § Next);
+  record/codegen, and the local test site for single-user runs (§ Next);
   (d) record+codegen vs. hand-written scripts — Eval 01 used codegen
   (`--target python-async`); (e) per-eval file contract — settled for
   script-fix cases by ADR-0001 (capture lands with grader-01 phase C). Outcome: an ADR + the matching `<FILL-IN>`s in CLAUDE.md and
@@ -83,30 +90,27 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   (`.claude/notes/test-site-element-inventory.md`): a release switch per
   component for drift cases, fixed seeded delays for timing cases. Serves varied
   generated cases, timing cases with controllable delays, grader-01 full
-  runs at suite scale, and the multi-user runs that may never hit a
-  third-party site (CLAUDE.md § Project pins: load-test safety).
-  *Depends on:* level-set (b, c) for the multi-user side; the single-user
-  side can start sooner.
-- **Eval: Playwright + Locust multi-user debug & fix** (numbered when
-  built; 02–06 go to grader-01's cases) — the framing prompt: *"debug &
-  fix this playwright+python+locust script `$somescript`; you can find the
-  results and pwtrace for a 1 user 1 iteration replay in
-  `$somedirectory`"*. *Depends on:* local test site, Eval 01 (eval
-  anatomy settled).
-- **Grader hardening (grader-01b residue)** — known gaps in
-  `tools/scriptfix`, none affecting Eval 01:
+  runs at suite scale. Single-user only (the CD, 2026-10-31: no
+  multi-user runs for now). *Depends on:* the inventory hands-on pass
+  (§ Needs Zack); design-heavy, so it needs a design pass with the CD
+  before a plan.
+- **Grader hardening + red-team agent** (grader-01b residue,
   `.claude/plans/DONE/grader-01b.deterministic-grader.follow-up.md`
-  § Deferred. The main one needs a CD design call: a step is any method
-  named like a Playwright action, so `seen.clear()` on a plain set reads
-  as a path step. The rest are mechanical (`**opts` timeouts, recursive
-  searches above the repo). *Depends on:* nothing; best before phase F's
-  pilot.
-- **Eval-integrity gate** — checks that join the pytest hard gate:
-  every `prompt.md` placeholder resolves under `inputs/`, nothing in
-  `prompt.md`/`inputs/` references `grading/` or names the repo's path,
-  required files exist, each `case.toml` is valid and each global-rubric
-  case's `prompt.md` matches `rubrics/script-fix/prompt.md`. *Depends on:*
-  Eval 01 (file contract), grader-01 phase C (case template).
+  § Deferred, items 1–4). It merges the former § Needs Zack AGENT-OPP
+  "grader red-team".
+  - *Decided 2026-10-31 (the CD):* the receiver rule is "Exclude proven
+    non-PW". A method isn't a step only when its receiver is provably not
+    Playwright (a literal, or a name assigned once from one); unknown
+    receivers still count.
+  - *Also decided:* the red-team is "Approve, with hardening". The run
+    uses it once on Eval 01, and its misses become the run's test cases.
+
+  It also covers `expect` variables, module constants, `**opts` and
+  unclassified timeouts, and answer-key searches above the repo.
+  *Depends on:* nothing; best before phase F's pilot.
+
+  **Plan ready (2026-10-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
 - **Private-names check script** (refine pass, 2026-10-31):
   `.claude/scripts/check-private-names.ps1` scans the staged diff and the
   commit message (or, with `-All`, every tracked file and the whole
@@ -114,6 +118,9 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   (`.claude/*.local.*`, gitignored). It replaces the hand greps run before
   each commit since the 2026-10-30 leak, and works from oversee worktrees
   by reading the list from the main checkout. Per the Script SOP.
+
+  **Plan ready (2026-10-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/privnames-01.check-script.md`
 - **Isolated trial environment** — a container/WSL distro holding only
   `prompt.md` + `inputs/`, its own Python + Playwright + Claude Code and
   settings (permissions, no MCP servers); WSL needs `[automount]
@@ -127,14 +134,13 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **Complete the scaffold's `<FILL-IN>` markers** (left by
   `/zmh-producer:studio-init`; most resolve at the first-eval level-set):
   - [ ] `CLAUDE.md` — stack/version ADR pin; static-reviewer agent name;
-        multi-user approach / local target / codegen workflow (Tech
-        stack). Done: trial-run loop + Playtest SOP, `skills/` list,
-        file contract for script-fix cases (ADR-0001)
+        codegen workflow (Tech stack). Done: trial-run loop + Playtest
+        SOP, `skills/` list, file contract for script-fix cases
+        (ADR-0001), multi-user approach (none for now, 2026-10-31)
   - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
         venv bootstrap; refine pass after grader-01b)
   - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
-        remaining Playwright/Locust API pins (waits + transaction timers
-        done)
+        remaining Playwright API pins (waits + transaction timers done)
   - [x] `.claude/standards/architecture.md` — shared-tooling location
         (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
@@ -161,4 +167,10 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Icebox
 
-*Nothing yet.*
+- **Eval: Playwright + Locust multi-user debug & fix** — iced 2026-10-31
+  by the CD: "We can remove locust all together; python+playwright is
+  sufficient for these evals, i need to do actual experiments with these
+  with single user first before i start thinking about issues that only
+  happen under a multiuser load." Revisit after single-user experiments;
+  any multi-user run still targets localhost only (CLAUDE.md § Project
+  pins).

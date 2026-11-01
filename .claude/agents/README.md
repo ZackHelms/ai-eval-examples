@@ -8,7 +8,7 @@ used only where a pin matters (model, tools, effort).
 
 <FILL-IN: this studio's specialist agents — one row per agent, e.g. an
 eval author (drafts prompt/inputs/grading to the eval anatomy), a research
-agent (version pins, Playwright/Locust capabilities, two-source rule), and
+agent (version pins, Playwright capabilities, two-source rule), and
 the static-review agent (answer-leak + eval-structure checks) that IS step 1
 of the project validation procedure. Keep the table format:>
 

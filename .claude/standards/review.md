@@ -19,8 +19,8 @@ changes beat large ones.
 2. **Self-containment** — every prompt placeholder resolves under
    `inputs/`; no absolute paths; the eval runs when copied out alone.
 3. **Pin compliance** — no load against public sites; `<FILL-IN:
-   static-reviewer checklist — Python/Playwright/Locust version and API
-   pins once the level-set decides them>`.
+   static-reviewer checklist — Python/Playwright version and API pins once
+   the level-set decides them>`.
 4. **Reproducibility** — fixtures are captured, not hand-edited, and say
    how they were produced.
 5. **Correctness & edge cases** — the reference fix actually fixes the

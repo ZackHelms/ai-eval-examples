@@ -2,7 +2,7 @@
 
 Applies to repo tooling (setup, capture, and check scripts) and to
 `evals/*/grading/` reference fixes. Stack: Markdown eval specs + per-eval
-Python/Playwright(/Locust) fixtures, pwsh repo scripts.
+Python/Playwright fixtures, pwsh repo scripts.
 
 **Never applies to `evals/*/inputs/`** — those are deliberately flawed;
 "cleaning them up" outside the eval's own authoring destroys the eval.
@@ -59,9 +59,9 @@ Python/Playwright(/Locust) fixtures, pwsh repo scripts.
   state. The next transaction starts with a plain action (e.g. `click()`)
   under a short timeout, because the previous assertion already proved its
   target ready.
-- `<FILL-IN: remaining Playwright/Locust API pins — e.g. sync vs async API,
-  locust-plugins user class, browser channel; one bullet per pin, quotable
-  verbatim by the static reviewer.>`
+- `<FILL-IN: remaining Playwright API pins — e.g. sync vs async API,
+  browser channel; one bullet per pin, quotable verbatim by the static
+  reviewer.>`
 
 ## Eval hygiene
 

@@ -92,7 +92,8 @@ Each element below feeds one or both of the two families the evals grade
 - Open-source components with correct ARIA roles, e.g. for the grid,
   combobox, tree, tabs, dialog, charts (one SVG, one canvas), map with
   local tiles, network graph, code editor and flow canvas.
-- One site serves single-user replays and, later, multi-user Locust runs.
+- One site serves single-user replays. Multi-user runs are out of scope
+  for now (CD, 2026-10-31: single-user experiments first).
 - New element kinds can come from any app type. Each one is added as an
   original component of that kind, never a copy of a product's look,
   names, icons or text.
