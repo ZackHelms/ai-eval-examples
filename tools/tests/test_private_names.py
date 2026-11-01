@@ -206,6 +206,27 @@ def test_all_finds_tracked_file_lines_and_paths(repo: Repo) -> None:
     assert_names_not_echoed(result)
 
 
+def test_all_from_a_subdirectory_still_sweeps_the_whole_repo(repo: Repo) -> None:
+    repo.commit_file("top.txt", f"x\n{NAME_ONE}\n", "chore: top")
+    sub = repo.path / "sub"
+    sub.mkdir()
+    result = repo.check("-All", cwd=sub)
+    assert result.code == 1
+    assert "HIT file top.txt:2 name #1" in result.out
+    assert_names_not_echoed(result)
+
+
+def test_default_scope_from_a_subdirectory_reports_repo_relative_paths(repo: Repo) -> None:
+    repo.write("top.txt", f"{NAME_TWO}\n")
+    repo.git("add", "top.txt")
+    sub = repo.path / "sub"
+    sub.mkdir()
+    result = repo.check(cwd=sub)
+    assert result.code == 1
+    assert "HIT staged top.txt:1 name #2" in result.out
+    assert_names_not_echoed(result)
+
+
 def test_all_is_clean_on_a_clean_repo(repo: Repo) -> None:
     result = repo.check("-All")
     assert result.code == 0

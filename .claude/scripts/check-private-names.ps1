@@ -113,8 +113,13 @@ $script:exitCode = 2
 
     # Runs git, hides its stderr (it could echo a pattern), and checks the exit
     # code. $Label names the step in the error; the arguments are never printed.
+    # Once $top is known every call runs from the repo root: `git grep` and
+    # `git ls-files` otherwise cover only the current subdirectory, and print
+    # paths relative to it.
+    $top = $null
     function Invoke-Git([string]$Label, [string[]]$GitArgs, [int[]]$OkCodes = @(0)) {
-        $out = & git -c core.quotepath=off @GitArgs 2>$null
+        $root = $top ? @('-C', $top) : @()
+        $out = & git @root -c core.quotepath=off @GitArgs 2>$null
         $code = $LASTEXITCODE
         if ($code -notin $OkCodes) { Fail "git failed ($Label, exit $code)." }
         if ($null -ne $out) { $out }
