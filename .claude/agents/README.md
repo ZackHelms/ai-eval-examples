@@ -9,6 +9,7 @@ used only where a pin matters (model, tools, effort).
 | Agent | Owns | Notes |
 | --- | --- | --- |
 | `eval-static-reviewer` | step 1 of the validation procedure: answer leaks, evidence, generic content, frozen Eval 01, scope | sonnet; read-only (Read, Grep, Glob, Bash); returns `VERDICT=`/`BLOCKERS=` lines |
+| `grader-red-team` | adversarial fake-fix variants against `tools/scriptfix`'s static checks | opus; writes only under `%TEMP%\redteam\`; returns `VARIANTS=`/`MISSES=` lines |
 
 Deliberately **not** created yet (add when the work actually starts, per
 `/zmh-producer:refine-context` Step 7): `<FILL-IN: agents this repo anticipates needing
