@@ -68,3 +68,27 @@ tags = ["retargeted", "broad-pattern"]
 
 [files."smell-first.py"]
 tags = ["retargeted", "first-nth"]
+
+[files."ok-plain-set.py"]
+tags = []
+
+[files."ok-expect-variable.py"]
+tags = []
+
+[files."zero-unawaited-assertion.py"]
+tags = ["weakened-check"]
+
+[files."zero-unawaited-click.py"]
+tags = ["changed-journey"]
+
+[files."zero-step-in-option.py"]
+tags = ["changed-journey"]
+
+[files."zero-click-trial.py"]
+tags = ["changed-journey"]
+
+[files."zero-shadowed-expect.py"]
+tags = ["weakened-check"]
+
+[files."ok-annotated-set-clear.py"]
+tags = []

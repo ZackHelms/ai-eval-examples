@@ -19,7 +19,12 @@ from scriptfix.detect import (
     detect,
 )
 from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
-from scriptfix.journey import TAG_ADDED_ASSERTION, TAG_CHANGED_JOURNEY, TAG_RETARGETED
+from scriptfix.journey import (
+    TAG_ADDED_ASSERTION,
+    TAG_CHANGED_JOURNEY,
+    TAG_RETARGETED,
+    TAG_WEAKENED_CHECK,
+)
 from scriptfix.static import check_static
 
 # Every body below runs inside ``async def run(page, context):`` after these.
@@ -646,6 +651,107 @@ def test_findings_come_in_table_order():
         """
     )
     assert tags(fix) == [TAG_SLEEP, TAG_FORCE, TAG_FORCED_EXIT, TAG_FIRST_NTH]
+
+
+# --- the shared classification: the journey and the detectors agree ----------
+
+
+def test_step_name_on_a_set_is_no_step_and_no_finding():
+    fix = with_extra('seen = {"a"}\nseen.clear()')
+    assert check_static(REFERENCE, fix) == []
+
+
+def test_step_name_on_a_set_in_a_branch_is_not_a_conditional_step():
+    fix = with_extra(
+        """
+        seen = set()
+        if flag:
+            seen.clear()
+        """
+    )
+    assert check_static(REFERENCE, fix) == []
+
+
+def test_held_expect_in_a_branch_is_a_conditional_step():
+    # The journey sees the held assertion, so the detector must too.
+    reference = with_extra('await expect(page.locator("h1")).to_be_visible()')
+    fix = with_extra(
+        """
+        check = expect(page.locator("h1"))
+        if flag:
+            await check.to_be_visible()
+        """
+    )
+    findings = check_static(reference, fix)
+    assert [f.tag for f in findings] == [TAG_CONDITIONAL_STEP], findings
+    assert findings[0].line == line_of(fix, "if flag")
+
+
+def test_held_expect_assertion_is_the_inline_one():
+    reference = with_extra('await expect(page.locator("h1")).to_be_visible()')
+    fix = with_extra('check = expect(page.locator("h1"))\nawait check.to_be_visible()')
+    assert check_static(reference, fix) == []
+
+
+def test_held_expect_timeout_and_pattern_are_found():
+    held = 'check = expect(page.locator("h1"))\n'
+    assert tags(with_extra(held + "await check.to_be_visible(timeout=60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra(held + 'await check.to_have_text(".*")')) == [TAG_BROAD_PATTERN]
+
+
+def test_set_options_on_a_held_expect_uses_the_assertion_default():
+    assert tags(with_extra("e = expect\ne.set_options(timeout=10000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("e = expect\ne.set_options(timeout=5000)")) == []
+
+
+def test_unawaited_step_in_a_branch_is_not_a_conditional_step():
+    fix = with_extra(
+        """
+        if flag:
+            page.get_by_role("link", name="Next").click()
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_unawaited_click_is_a_changed_journey():
+    fix = script(REFERENCE_BODY.replace("await page.get_by_role", "page.get_by_role"))
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_CHANGED_JOURNEY]
+
+
+def test_unawaited_assertion_is_a_weakened_check():
+    fix = script(REFERENCE_BODY.replace("await expect(", "expect("))
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_WEAKENED_CHECK]
+
+
+def test_step_inside_a_step_argument_is_a_changed_journey_and_a_conditional_step():
+    plain = script(
+        REFERENCE_BODY.replace(".click()", ".click(no_wait_after=not await page.reload())")
+    )
+    assert [f.tag for f in check_static(REFERENCE, plain)] == [TAG_CHANGED_JOURNEY]
+    branch = script(
+        REFERENCE_BODY.replace(".click()", ".click(no_wait_after=flag or await page.reload())")
+    )
+    assert TAG_CONDITIONAL_STEP in {f.tag for f in check_static(REFERENCE, branch)}
+
+
+def test_trial_click_is_a_changed_journey_and_trial_false_is_not():
+    trial = script(REFERENCE_BODY.replace(".click()", ".click(trial=True)"))
+    assert [f.tag for f in check_static(REFERENCE, trial)] == [TAG_CHANGED_JOURNEY]
+    real = script(REFERENCE_BODY.replace(".click()", ".click(trial=False)"))
+    assert check_static(REFERENCE, real) == []
+
+
+def test_shadowed_expect_is_a_weakened_check():
+    fix = script(REFERENCE_BODY) + "\n\ndef expect(actual):\n    return actual\n"
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_WEAKENED_CHECK]
+
+
+def test_annotated_set_is_no_step_and_no_finding():
+    fix = with_extra('seen: set[str] = {"a"}\nseen.clear()')
+    assert check_static(REFERENCE, fix) == []
 
 
 # --- check_static ------------------------------------------------------------

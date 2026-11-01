@@ -9,7 +9,9 @@ doesn't have, not just at the first one.
 
 Detection is syntactic and walks the whole module. The tags, severities and
 the meaning of each construct are defined by rubric-v0.md ("Rejected
-constructs"); the classification tables are shared with ``steps``.
+constructs"); the classification tables are shared with ``steps``, and a
+call is a step here exactly when ``steps.classify_module`` says so, so the
+journey and the detectors never disagree on what a step is.
 """
 
 from __future__ import annotations
@@ -29,10 +31,10 @@ from scriptfix.steps import (
     KIND_ACTION,
     KIND_ASSERTION,
     KIND_NAVIGATION,
+    call_key,
     call_name,
-    classify_call,
+    classify_module,
     is_assertion_call,
-    is_expect_call,
     is_expect_ref,
 )
 
@@ -91,10 +93,13 @@ _Collector = Callable[["_Module"], list[_Hit]]
 
 
 class _Module:
-    """A parsed module plus the import aliases the detectors resolve names with."""
+    """A parsed module, its call classification, and the import aliases the
+    detectors resolve names with."""
 
     def __init__(self, source: str) -> None:
         self.tree = ast.parse(source)
+        # The journey's classification: a detector's step is the journey's step.
+        self.kinds = classify_module(self.tree)
         # alias -> imported module (``import time as t``)
         self.modules: dict[str, str] = {}
         # alias -> (module, name) (``from time import sleep as nap``)
@@ -107,6 +112,10 @@ class _Module:
             elif isinstance(node, ast.ImportFrom) and node.module is not None:
                 for alias in node.names:
                     self.names[alias.asname or alias.name] = (node.module, alias.name)
+
+    def kind(self, call: ast.Call) -> str | None:
+        """The step kind ``steps.classify_module`` gave ``call``, else ``None``."""
+        return self.kinds.get(call_key(call))
 
     def calls(self) -> list[ast.Call]:
         """Every call in the module, in source order."""
@@ -150,17 +159,13 @@ def _own_nodes(nodes: Iterable[ast.AST]) -> Iterator[ast.AST]:
             stack.extend(ast.iter_child_nodes(node))
 
 
-def _is_step_call(node: ast.AST) -> bool:
+def _is_step_call(module: _Module, node: ast.AST) -> bool:
     """True for a navigation, action or assertion call (markers don't count)."""
-    if not isinstance(node, ast.Call):
-        return False
-    func = node.func
-    receiver = _key(func.value) if isinstance(func, ast.Attribute) else None
-    return classify_call(node, receiver) in _JOURNEY_KINDS
+    return isinstance(node, ast.Call) and module.kind(node) in _JOURNEY_KINDS
 
 
-def _contains_step(nodes: Iterable[ast.AST]) -> bool:
-    return any(_is_step_call(inner) for node in nodes for inner in ast.walk(node))
+def _contains_step(module: _Module, nodes: Iterable[ast.AST]) -> bool:
+    return any(_is_step_call(module, inner) for node in nodes for inner in ast.walk(node))
 
 
 def _number(node: ast.expr) -> float | None:
@@ -226,17 +231,21 @@ def _longer_timeouts(module: _Module) -> list[_Hit]:
         name = call_name(call)
         value: ast.expr | None = None
         limit = DEFAULT_TIMEOUT_MS
+        kind = module.kind(call)
+        # The setters count on any receiver (the stricter reading); an
+        # ``expect`` held in a name makes ``set_options`` setup too.
+        is_expect_setup = name == "set_options" and (
+            kind is not None or (isinstance(func, ast.Attribute) and is_expect_ref(func.value))
+        )
         if isinstance(func, ast.Attribute) and name in DEFAULT_TIMEOUT_SETTERS:
             keyword = _kwarg(call, "timeout")
             value = call.args[0] if call.args else (keyword.value if keyword else None)
-        elif isinstance(func, ast.Attribute) and name == "set_options" and is_expect_ref(func.value):
+        elif is_expect_setup:
             keyword = _kwarg(call, "timeout")
             value = keyword.value if keyword else None
             limit = DEFAULT_ASSERTION_TIMEOUT_MS
         else:
             keyword = _kwarg(call, "timeout")
-            receiver = _key(func.value) if isinstance(func, ast.Attribute) else None
-            kind = classify_call(call, receiver)
             if keyword is not None and kind is not None:
                 value = keyword.value
                 if kind == KIND_ASSERTION:
@@ -278,7 +287,7 @@ def _conditional_steps(module: _Module) -> list[_Hit]:
 
     def visit(node: ast.AST) -> None:
         parts = _conditional_parts(node)
-        if parts is not None and _contains_step(parts):
+        if parts is not None and _contains_step(module, parts):
             # Count the outermost construct once; what it contains is inside it.
             hits.append(_Hit(_key(node), node.lineno, f"{type(node).__name__} around a step"))
             return
@@ -288,7 +297,7 @@ def _conditional_steps(module: _Module) -> list[_Hit]:
     visit(module.tree)
     for function in (n for n in ast.walk(module.tree) if isinstance(n, _FUNCTIONS)):
         own = list(_own_nodes(function.body))
-        if not _contains_step(own):
+        if not _contains_step(module, own):
             continue
         for node in own:
             # A return that ends the function body skips nothing.
@@ -349,7 +358,9 @@ def _broad_patterns(module: _Module) -> list[_Hit]:
         if name == "compile" and module_name in (None, "re") and call.args:
             candidates.append(call.args[0])
         candidates.extend(kw.value for kw in call.keywords if kw.arg in PATTERN_KWARGS)
-        if is_assertion_call(call):
+        # The journey's assertions (an ``expect(...)`` held in a name too), and
+        # any inline matcher on ``expect(...)`` even where it isn't a step.
+        if is_assertion_call(call) or module.kind(call) == KIND_ASSERTION:
             candidates.extend(call.args)
             candidates.extend(kw.value for kw in call.keywords)
     hits = []

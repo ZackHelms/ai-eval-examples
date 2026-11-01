@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import textwrap
 
 import pytest
@@ -14,6 +15,9 @@ from scriptfix.steps import (
     KIND_SETUP,
     KIND_WAIT,
     Step,
+    call_key,
+    call_name,
+    classify_module,
     extract_steps,
 )
 
@@ -187,6 +191,256 @@ def test_set_options_on_another_receiver_is_not_a_step() -> None:
 
 def test_unknown_playwright_methods_are_not_steps() -> None:
     assert steps_of('page.get_by_role("link").count()') == []
+
+
+# --- the shared classification ------------------------------------------------
+
+
+def test_classify_module_keys_every_step_by_start_and_end() -> None:
+    source = textwrap.dedent(ASYNC_SCRIPT)
+    tree = ast.parse(source)
+    kinds = classify_module(tree)
+    assert sorted(kinds.values()) == sorted(s.kind for s in steps_of(ASYNC_SCRIPT))
+    matcher = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.Call) and call_name(n) == "to_be_visible"
+    )
+    inner = matcher.func.value  # the expect(...) call, starting where the matcher does
+    assert call_key(matcher)[:2] == call_key(inner)[:2]
+    assert kinds[call_key(matcher)] == KIND_ASSERTION
+    assert call_key(inner) not in kinds
+
+
+def test_step_name_on_a_set_literal_is_not_a_step() -> None:
+    source = """
+        seen = {"a"}
+        seen.clear()
+    """
+    assert steps_of(source) == []
+
+
+@pytest.mark.parametrize(
+    "receiver",
+    ['"s"', "[1]", "(1, 2)", "{1}", '{"k": 1}', 'f"{x}"', "[n for n in ns]", "set()", "dict(a=1)"],
+)
+def test_literal_and_builtin_receivers_are_not_steps(receiver: str) -> None:
+    assert steps_of(f"{receiver}.clear()") == []
+
+
+def test_builtin_rebound_in_the_module_is_an_unknown_receiver() -> None:
+    source = """
+        set = lambda: page
+        set().click()
+    """
+    assert kinds_and_names(source) == [(KIND_ACTION, "click")]
+
+
+@pytest.mark.parametrize("rebinding", ["def f(set): pass", "from helpers import *"])
+def test_builtin_that_may_be_rebound_elsewhere_is_an_unknown_receiver(rebinding: str) -> None:
+    assert kinds_and_names(f"{rebinding}\nset().click()") == [(KIND_ACTION, "click")]
+
+
+def test_subscript_receiver_is_still_a_step() -> None:
+    assert kinds_and_names("[page][0].click()") == [(KIND_ACTION, "click")]
+
+
+def test_parameter_receiver_is_still_a_step() -> None:
+    assert kinds_and_names("def go(p):\n    p.click()") == [(KIND_ACTION, "click")]
+
+
+def test_non_step_method_on_a_string_is_nothing() -> None:
+    source = """
+        x = "s"
+        x.strip()
+    """
+    assert steps_of(source) == []
+
+
+def test_expect_held_in_a_name_is_the_inline_assertion() -> None:
+    inline = """
+        async def run(page):
+            loc = page.get_by_role("link", name="Next")
+            await expect(loc).to_be_visible(timeout=1000)
+    """
+    held = """
+        async def run(page):
+            loc = page.get_by_role("link", name="Next")
+            check = expect(loc)
+            await check.to_be_visible(timeout=1000)
+    """
+    first, second = steps_of(inline), steps_of(held)
+    assert [(s.kind, s.name, s.target, s.values, s.options) for s in first] == [
+        (s.kind, s.name, s.target, s.values, s.options) for s in second
+    ]
+    assert first[0].target == "page.get_by_role('link', name='Next')"
+
+
+def test_expect_assigned_twice_is_not_an_assertion() -> None:
+    source = """
+        async def run(page):
+            check = expect(page.locator("a"))
+            check = expect(page.locator("b"))
+            await check.to_be_visible()
+    """
+    assert steps_of(source) == []
+
+
+def test_one_held_expect_used_twice_is_two_assertions() -> None:
+    source = """
+        async def run(page):
+            e = expect(page.locator("a"))
+            await e.to_be_visible()
+            await e.to_have_text("A")
+    """
+    assert [(s.kind, s.name, s.target) for s in steps_of(source)] == [
+        (KIND_ASSERTION, "to_be_visible", "page.locator('a')"),
+        (KIND_ASSERTION, "to_have_text", "page.locator('a')"),
+    ]
+
+
+def test_unawaited_step_statements_in_an_async_def_are_not_steps() -> None:
+    source = """
+        async def run(page):
+            page.goto("a")
+            page.locator("b").click()
+            expect(page.locator("c")).to_be_visible()
+            await page.locator("d").click()
+    """
+    assert [(s.kind, s.name, s.target) for s in steps_of(source)] == [
+        (KIND_ACTION, "click", "page.locator('d')")
+    ]
+
+
+def test_unawaited_setup_and_waits_keep_their_kind() -> None:
+    source = """
+        async def run(page):
+            page.set_default_timeout(1000)
+            page.wait_for_timeout(10)
+            expect.set_options(timeout=1000)
+    """
+    assert kinds_and_names(source) == [
+        (KIND_SETUP, "set_default_timeout"),
+        (KIND_WAIT, "wait_for_timeout"),
+        (KIND_SETUP, "set_options"),
+    ]
+
+
+def test_step_statements_outside_an_async_def_are_steps() -> None:
+    source = """
+        page.click("a")
+
+        def run(page):
+            page.click("b")
+
+        async def outer(page):
+            def inner():
+                page.click("c")
+    """
+    assert [s.values for s in steps_of(source)] == [("'a'",), ("'b'",), ("'c'",)]
+
+
+def test_unawaited_step_nested_in_another_expression_is_still_a_step() -> None:
+    source = """
+        async def run(page):
+            await asyncio.gather(page.click("a"))
+            asyncio.ensure_future(page.click("b"))
+    """
+    assert [s.values for s in steps_of(source)] == [("'a'",), ("'b'",)]
+
+
+def test_steps_in_a_classified_call_come_before_it() -> None:
+    source = """
+        async def run(page):
+            await page.locator(await page.goto("a")).click(no_wait_after=not await page.reload())
+    """
+    assert kinds_and_names(source) == [
+        (KIND_NAVIGATION, "goto"),
+        (KIND_NAVIGATION, "reload"),
+        (KIND_ACTION, "click"),
+    ]
+
+
+def test_arguments_of_an_unawaited_step_are_still_searched() -> None:
+    source = """
+        async def run(page):
+            page.click("a", no_wait_after=await page.reload())
+    """
+    assert kinds_and_names(source) == [(KIND_NAVIGATION, "reload")]
+
+
+@pytest.mark.parametrize(
+    ("trial", "is_step"),
+    [("trial=False", True), ("trial=True", False), ("trial=flag", False), ("trial=1", False)],
+)
+def test_trial_action_is_not_a_step(trial: str, is_step: bool) -> None:
+    steps = steps_of(f'page.locator("a").click({trial})')
+    assert [s.name for s in steps] == (["click"] if is_step else [])
+
+
+def test_trial_keyword_on_a_non_action_keeps_its_kind() -> None:
+    assert kinds_and_names('page.goto("a", trial=True)') == [(KIND_NAVIGATION, "goto")]
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        "from playwright.async_api import expect",
+        "from playwright.sync_api import expect",
+        "from playwright.async_api import *",
+        "import asyncio",  # no binding of expect at all
+    ],
+)
+def test_playwright_expect_makes_assertions(binding: str) -> None:
+    source = f"{binding}\nexpect(page).to_have_url('a')\nexpect.set_options(timeout=1000)"
+    assert kinds_and_names(source) == [
+        (KIND_ASSERTION, "to_have_url"),
+        (KIND_SETUP, "set_options"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        "def expect(actual):\n    return actual",
+        "class expect: pass",
+        "expect = make_checker()",
+        "from playwright.async_api import expect as expect",
+        "from helpers import expect",
+        "from helpers import *",
+        "import expect",
+        "def run(expect): pass",
+        "for expect in checkers: pass",
+        "from playwright.async_api import expect\nexpect = other",
+    ],
+)
+def test_shadowed_expect_makes_no_assertions(binding: str) -> None:
+    source = f"{binding}\nexpect(page).to_have_url('a')\nexpect.set_options(timeout=1000)"
+    assert steps_of(source) == []
+
+
+def test_attribute_expect_is_unchanged_when_the_name_is_shadowed() -> None:
+    source = "def expect(actual):\n    return actual\npw.expect(page).to_have_url('a')"
+    assert kinds_and_names(source) == [(KIND_ASSERTION, "to_have_url")]
+
+
+def test_annotated_assignment_is_a_plain_binding() -> None:
+    source = """
+        def run(page):
+            seen: set[str] = {"a"}
+            seen.clear()
+            link: object = page.locator("b")
+            link.click()
+    """
+    assert [(s.name, s.target) for s in steps_of(source)] == [("click", "page.locator('b')")]
+
+
+def test_annotation_without_a_value_is_another_binding() -> None:
+    source = """
+        def run(page):
+            seen: set[str]
+            seen = {"a"}
+            seen.clear()
+    """
+    assert [(s.name, s.target) for s in steps_of(source)] == [("clear", "seen")]
 
 
 # --- arguments --------------------------------------------------------------
