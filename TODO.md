@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **privnames-01: private-names check script** — oversee run of
+  `.claude/plans/privnames-01.check-script.md`, started 2026-10-31 by
+  `/zmh-producer:oversee-implementation .claude/plans/privnames-01.check-script.md`
+  on branch `worktree-oversee+privnames-01`. No commits landed yet.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
