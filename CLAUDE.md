@@ -68,10 +68,9 @@ one exists.
 ## Validation (the project gate — referenced everywhere as "the validation procedure")
 
 1. **Static review pre-pass** of every changed file — prefer delegating to
-   `<FILL-IN: this repo's static-reviewer agent name — e.g. an answer-leak /
-   eval-structure reviewer>` (checklist baked in; zero Blockers to pass).
-   Cheap; catches answer leaks and placeholder mismatches before spending a
-   gate run.
+   `eval-static-reviewer` (`.claude/agents/eval-static-reviewer.md`)
+   (checklist baked in; zero Blockers to pass). Cheap; catches answer
+   leaks and placeholder mismatches before spending a gate run.
 2. **Hard gate:** `.\.venv\Scripts\python.exe -m pytest` from the repo
    root (`pytest.ini` points it at `tools/tests/`); it must exit 0.
 3. **Dependency/manifest sanity** when the venv requirements or tool

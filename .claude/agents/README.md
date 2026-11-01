@@ -6,15 +6,9 @@ used only where a pin matters (model, tools, effort).
 
 ## Specialists
 
-<FILL-IN: this studio's specialist agents — one row per agent, e.g. an
-eval author (drafts prompt/inputs/grading to the eval anatomy), a research
-agent (version pins, Playwright capabilities, two-source rule), and
-the static-review agent (answer-leak + eval-structure checks) that IS step 1
-of the project validation procedure. Keep the table format:>
-
 | Agent | Owns | Notes |
 | --- | --- | --- |
-| `<FILL-IN>` | `<FILL-IN: eval domain or validation step>` | `<FILL-IN: model/tools pin, invariant it guards>` |
+| `eval-static-reviewer` | step 1 of the validation procedure: answer leaks, evidence, generic content, frozen Eval 01, scope | sonnet; read-only (Read, Grep, Glob, Bash); returns `VERDICT=`/`BLOCKERS=` lines |
 
 Deliberately **not** created yet (add when the work actually starts, per
 `/zmh-producer:refine-context` Step 7): `<FILL-IN: agents this repo anticipates needing
