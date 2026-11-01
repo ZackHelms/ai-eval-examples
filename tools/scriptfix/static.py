@@ -23,7 +23,8 @@ def _has_zero(findings: list[Finding]) -> bool:
     return any(finding.severity == SEVERITY_ZERO for finding in findings)
 
 
-def _step_key(step: Step) -> tuple:
+def step_key(step: Step) -> tuple:
+    """What makes two steps the same step: everything but the line."""
     return (step.kind, step.name, step.target, step.values, step.options)
 
 
@@ -44,8 +45,8 @@ def blocked_step(reference: list[Step], broken: list[Step]) -> Step | None:
     when there's no such step: the input isn't the reference plus exactly
     one step, so the case breaks its contract.
     """
-    ref_keys = [_step_key(step) for step in reference]
-    keys = [_step_key(step) for step in broken]
+    ref_keys = [step_key(step) for step in reference]
+    keys = [step_key(step) for step in broken]
     if len(keys) != len(ref_keys) + 1:
         return None
     return next(
