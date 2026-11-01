@@ -16,6 +16,8 @@ the grading material it must not see: a reference fix and rubric
 - `.\01-setup-env.ps1 --help` to see what it does before running it
 - `.\01-setup-env.ps1`
 - `.\.venv\Scripts\python.exe -m pytest` runs the tests (the project gate)
+- `.\10-make-case.ps1 -h` builds a script-fix case from its recipe and
+  captures its evidence
 - `.\30-grade-trials.ps1 -h` grades saved trials of a script-fix eval and
   reports pass rates
 

@@ -36,6 +36,9 @@ run, never hand-edited. Each eval records how its fixtures were produced
 (tool versions, target, user/iteration counts) so they can be regenerated
 and so a grader can tell a stale fixture from a real failure. Multi-user
 captures run only against a local target (CLAUDE.md § Project pins).
+Generated cases record their capture (tool versions, target, 1 user × 1
+iteration, exit codes) in `grading/capture.toml`, written by
+`10-make-case.ps1`.
 
 ## Learnings
 

@@ -135,7 +135,8 @@ outside the eval's own authoring. Nothing in `prompt.md` or `inputs/` may
 hint at the answer: no comments naming the bug, no file names like
 `fixed_*.py`, no reference-fix fragments. Script-fix cases follow ADR-0001's
 file contract (`case.toml`, `recipe.toml`, `reference/`, `corpus/`);
-capture and regeneration arrive with grader-01 phase C (`10-make-case.ps1`).
+`.\10-make-case.ps1` captures and regenerates them, recording how in
+`grading/capture.toml`.
 
 ## Working process (do not skip)
 

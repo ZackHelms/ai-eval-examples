@@ -26,6 +26,15 @@ without approval. So with these rules the model can read and edit, but
 can't run the script or fetch the web: that's the subject's tool profile
 (`edit-only`). Record it with the result.
 
+## Making a case
+
+Building a case and capturing its evidence is
+`.claude/skills/scriptfix-grader.md` § Extending it. The capture runs in
+the neutral folder `%TEMP%\pwrun\` with the capture venv
+`%LOCALAPPDATA%\pwrun\venv` (built by `.\01-setup-env.ps1 -VenvDir ...
+-NoActivate`, which `10-make-case.ps1` runs), so the evidence (paths in
+results and traces) never names the repo.
+
 ## Launcher gotchas (each one cost runs)
 
 1. **Use absolute allow rules** (`//c/...`). A relative rule

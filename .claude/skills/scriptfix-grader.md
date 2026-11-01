@@ -90,15 +90,28 @@ tags are recorded only on `pending-judge`.
 
 ## Extending it
 
-- **A new case:**
+- **A new case** (the make-case flow):
   - Name its folder `NN-name`.
-  - Give it a `grading/case.toml` with `rubric`, `expected`, `issue`,
+  - Write `grading/recipe.toml` (the source, an optional cut, one-line
+    edits) and `grading/case.toml` with `rubric`, `expected`, `issue`,
     `origin`, `defect`, `fails_at`, `target` and an optional `note`.
     Unknown keys are errors.
-  - Give it a `grading/corpus/*.py`, each the reference plus one edit, and
-    a `corpus.toml`: `reference = "../reference/script.py"`, then one
-    `[files."x.py"]` table with `tags = [...]` per file.
+  - `.\10-make-case.ps1 -Case evals\<slug> -DryRun` until the diff is the
+    intended break.
+  - `.\10-make-case.ps1 -Case evals\<slug>` makes two single replays in a
+    neutral folder, then writes the reference, the input, `prompt.md`,
+    `results.txt`, the trace and `grading/capture.toml`. A surprise writes
+    nothing. Run it once more to confirm `fails_at`.
+  - Then the labeled corpus: `grading/corpus/*.py`, each the reference plus
+    one edit, and a `corpus.toml`: `reference = "../reference/script.py"`,
+    then one `[files."x.py"]` table with `tags = [...]` per file. An
+    escalate corpus is graded with `expected="escalate"` and the input.
   - `test_corpus.py` finds every corpus and fails on any unlabeled file.
+  - `grading/capture.toml` is written by the grader and records how the
+    fixtures were produced. It extends ADR-0001's case contract without
+    changing it.
+  - `tools/tests/test_eval_integrity.py` checks every eval: generated cases
+    get the full set, Eval 01 (hand-made) the structural checks only.
 - **A new detector or step kind:**
   - Extend the tables in `steps.py` or the collectors in `detect.py`.
   - Add a corpus file that shows it.
@@ -118,7 +131,8 @@ tags are recorded only on `pending-judge`.
 | `steps.py` | step tables, classification, normalization |
 | `journey.py` | the four journey rules |
 | `detect.py` | the fake-fix detectors |
-| `static.py` | journey plus detectors (and the escalate variant) |
+| `static.py` | journey plus detectors (and the escalate variant, where a retargeted blocked step is a zero) |
+| `makecase.py` | recipes, building the reference and input, the neutral capture |
 | `transcript.py` | reading transcripts; validity and fair-play checks |
 | `replay.py` | isolated replays |
 | `stats.py` | `lower_bound` |

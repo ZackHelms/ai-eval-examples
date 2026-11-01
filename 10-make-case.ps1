@@ -8,11 +8,13 @@
 .DESCRIPTION
     Wraps `python -m scriptfix make-case` from the repo's venv. From the case's
     grading\recipe.toml it builds the reference and the input script, then
-    replays the input once against the case's target in the capture venv
-    ($env:LOCALAPPDATA\pwrun\venv, a folder outside the repo) and records the
-    result and trace as the case's evidence, plus capture.toml. A dry run
-    builds and checks everything in memory and writes nothing. Captures are
-    single, sequential replays against the case's target.
+    replays the reference (from a temp copy; it must exit 0) and then the
+    input (in %TEMP%\pwrun; it must fail at the case's fails_at), both with
+    the capture venv's python ($env:LOCALAPPDATA\pwrun\venv, a folder outside
+    the repo), and records the result and trace as the case's evidence, plus
+    capture.toml. A dry run builds and checks everything in memory and writes
+    nothing. Captures are single, sequential replays against the case's
+    target.
 
     Unless -DryRun, it first builds or verifies the capture venv with
     .\01-setup-env.ps1 -VenvDir ... -NoActivate (about a minute the first time).
