@@ -313,6 +313,192 @@ def test_timeout_on_unclassified_call_is_ignored():
     assert tags(with_extra("requests.get(url, timeout=120)")) == []
 
 
+def click_with(arguments: str) -> str:
+    """The reference with the click's argument list replaced."""
+    return script(REFERENCE_BODY.replace(".click()", f".click({arguments})"))
+
+
+def wrapped_click(header: str) -> str:
+    """The reference with its click inside ``header`` (an ``async with`` line)."""
+    click = 'await page.get_by_role("link", name="Start").click()'
+    assert REFERENCE_BODY.count(click) == 1
+    return script(REFERENCE_BODY.replace(click, f"{header}\n        {click}"))
+
+
+def test_double_star_dict_display_contributes_its_timeout():
+    fix = click_with('**{"timeout": 60000}')
+    finding = only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "60000")
+    assert tags(click_with('**{"timeout": 1000}')) == []
+    assert tags(click_with('**{"timeout": 0}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"timeout": LIMIT}')) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_dict_display_with_other_keys_and_an_assertion_limit():
+    assert tags(click_with('**{"delay": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"delay": 5}')) == []
+    long_assertion = script(
+        REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 10000})')
+    )
+    assert tags(long_assertion) == [TAG_LONGER_TIMEOUT]
+    ok_assertion = script(
+        REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 5000})')
+    )
+    assert tags(ok_assertion) == []
+
+
+def test_double_star_dict_call_is_read_like_the_display():
+    assert tags(click_with("**dict(timeout=60000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(timeout=1000)")) == []
+    assert tags(click_with("**dict(force=True)")) == [TAG_FORCE]
+    assert tags(click_with("**dict(force=False)")) == []
+
+
+def test_double_star_dict_call_that_may_hold_more_is_opaque():
+    # Positional arguments, a nested ``**`` or a rebound ``dict`` can hold a timeout.
+    assert tags(click_with("**dict(base, delay=5)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(**base)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{**base, "delay": 5}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"timeout": 1000, "timeout": 2000}')) == [TAG_LONGER_TIMEOUT]
+    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(delay=5))")) + (
+        "\n\ndef dict(**kwargs):\n    return {'timeout': 60000}\n"
+    )
+    assert tags(rebound) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_variable_on_a_classified_call_is_an_opaque_longer_timeout():
+    fix = click_with("**opts")
+    finding = only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert "opaque **kwargs on click" in finding.detail
+    assert finding.line == line_of(fix, "**opts")
+    # Every classified kind: navigation, assertion, setup and action.
+    assert tags(script(REFERENCE_BODY.replace('example.test/")', 'example.test/", **opts)'))) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(script(REFERENCE_BODY.replace("to_be_visible()", "to_be_visible(**opts)"))) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("page.set_default_timeout(**opts)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("expect.set_options(**opts)")) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_on_an_unclassified_call_is_ignored():
+    assert tags(with_extra("print(**opts)")) == []
+    assert tags(with_extra("requests.get(url, **opts)")) == []
+
+
+def test_double_star_timeouts_already_in_reference():
+    for arguments in ("**opts", '**{"timeout": 60000}', "**dict(timeout=60000)"):
+        reference = click_with(arguments)
+        assert found(click_with(arguments), reference) == [], arguments
+
+
+def test_double_star_force_from_a_dict_display():
+    fix = click_with('**{"force": True}')
+    finding = only(fix, TAG_FORCE, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "force")
+    assert tags(click_with('**{"force": False}')) == []
+    assert tags(click_with('**{"force": flag}')) == [TAG_FORCE]
+    # An opaque ``**`` is only a longer-timeout, never a force.
+    assert tags(click_with("**opts")) == [TAG_LONGER_TIMEOUT]
+    assert found(click_with('**{"force": True}'), click_with('**{"force": True}')) == []
+
+
+def test_timeout_on_an_unclassified_call_is_checked_against_the_default():
+    long_wait = wrapped_click("async with page.expect_navigation(timeout=60000):")
+    finding = only(long_wait, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert finding.line == line_of(long_wait, "expect_navigation")
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=1000):")) == []
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=30000):")) == []
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=0):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=LIMIT):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("text = await page.locator('h1').text_content(timeout=60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("async with page.expect_response('**/api', timeout=60000):\n    pass")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+
+
+def test_timeout_on_an_unclassified_call_under_the_default_is_fine():
+    # (``wait_for`` is also a new-wait name, whichever receiver it has.)
+    assert TAG_LONGER_TIMEOUT not in tags(with_extra("await asyncio.wait_for(task, timeout=60)"))
+    assert tags(with_extra("requests.get(url, timeout=120)")) == []
+    assert tags(with_extra("await queue.get(timeout=1000)")) == []
+
+
+def test_unclassified_timeout_already_in_reference():
+    header = "async with page.expect_navigation(timeout=60000):"
+    assert found(wrapped_click(header), wrapped_click(header)) == []
+    assert found(with_extra("requests.get(url, timeout=0)"), with_extra("requests.get(url, timeout=0)")) == []
+
+
+def test_unclassified_call_reads_a_timeout_from_a_double_star_dict():
+    assert tags(wrapped_click('async with page.expect_navigation(**{"timeout": 0}):')) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click("async with page.expect_navigation(**dict(timeout=60000)):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click('async with page.expect_navigation(**{"timeout": 1000}):')) == []
+    # An opaque ``**`` on a call the journey doesn't classify is no hit.
+    assert tags(wrapped_click("async with page.expect_navigation(**opts):")) == []
+    header = 'async with page.expect_navigation(**{"timeout": 0}):'
+    assert found(wrapped_click(header), wrapped_click(header)) == []
+
+
+def test_trial_click_with_a_long_timeout_is_still_a_longer_timeout():
+    # A trial click isn't a step, so the unclassified rule is what catches it.
+    fix = click_with("trial=True, timeout=60000")
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_JOURNEY, TAG_LONGER_TIMEOUT}
+    assert tags(click_with("trial=True, timeout=1000")) == []
+    assert found(fix, fix) == []
+
+
+def test_timeout_setter_used_as_a_value():
+    alias = with_extra("set_wait = page.set_default_timeout\nset_wait(60000)")
+    finding = only(alias, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert "set_default_timeout used as a value" in finding.detail
+    assert finding.line == line_of(alias, "set_wait =")
+    navigation = with_extra("set_wait = page.set_default_navigation_timeout")
+    assert tags(navigation) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts = expect.set_options")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("hook = functools.partial(page.set_default_timeout, 60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("handlers = [page.set_default_timeout]")) == [TAG_LONGER_TIMEOUT]
+
+
+def test_timeout_setter_calls_are_not_values():
+    assert tags(with_extra("page.set_default_timeout(10000)")) == []
+    assert tags(with_extra("await page.set_default_timeout_later(10000)")) == []
+    assert tags(with_extra("page.set_default_timeout = 5")) == []
+    assert tags(with_extra("expect.set_options(timeout=5000)")) == []
+
+
+def test_timeout_setter_used_as_a_value_already_in_reference():
+    extra = "set_wait = page.set_default_timeout\nset_wait(60000)"
+    assert found(with_extra(extra), with_extra(extra)) == []
+
+
+def test_set_options_on_any_receiver_uses_the_assertion_default():
+    imported = "from playwright.async_api import expect as pw_expect\n"
+    assert tags(with_extra(imported + "pw_expect.set_options(timeout=20000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra(imported + "pw_expect.set_options(timeout=5000)")) == []
+    assert tags(with_extra("checks.expect.set_options(timeout=20000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("anything().set_options(timeout=0)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts.set_options(timeout=LIMIT)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts.set_options(timeout=1000)")) == []
+    extra = imported + "pw_expect.set_options(timeout=20000)"
+    assert found(with_extra(extra), with_extra(extra)) == []
+
+
 # --- force -------------------------------------------------------------------
 
 

@@ -104,3 +104,24 @@ tags = ["weakened-check"]
 
 [files."judge-module-constant-globals.py"]
 tags = ["retargeted"]
+
+[files."zero-opts-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-opts-variable.py"]
+tags = ["longer-timeout"]
+
+[files."zero-expect-navigation-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-known-dict-call-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-unclassified-opts-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-default-timeout-alias.py"]
+tags = ["longer-timeout"]
+
+[files."zero-expect-alias-set-options.py"]
+tags = ["longer-timeout"]

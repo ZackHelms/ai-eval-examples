@@ -31,11 +31,12 @@ from scriptfix.steps import (
     KIND_ACTION,
     KIND_ASSERTION,
     KIND_NAVIGATION,
+    TIMEOUT_SETTERS,
+    _ModuleFacts,
     call_key,
     call_name,
     classify_module,
     is_assertion_call,
-    is_expect_ref,
 )
 
 TAG_SWALLOWED_ERROR = "swallowed-error"
@@ -100,6 +101,8 @@ class _Module:
         self.tree = ast.parse(source)
         # The journey's classification: a detector's step is the journey's step.
         self.kinds = classify_module(self.tree)
+        # The journey's reading of a ``**`` value that spells out its keywords.
+        self.facts = _ModuleFacts.of(self.tree)
         # alias -> imported module (``import time as t``)
         self.modules: dict[str, str] = {}
         # alias -> (module, name) (``from time import sleep as nap``)
@@ -116,6 +119,27 @@ class _Module:
     def kind(self, call: ast.Call) -> str | None:
         """The step kind ``steps.classify_module`` gave ``call``, else ``None``."""
         return self.kinds.get(call_key(call))
+
+    def keywords(self, call: ast.Call) -> tuple[list[tuple[str, ast.expr]], list[ast.expr]]:
+        """Split ``call``'s keywords into ``(named, opaque)``.
+
+        ``named`` has the explicit keywords and the entries of a ``**`` that
+        spells them out (``**{"k": v}`` or ``**dict(k=v)``, as the journey
+        reads them); ``opaque`` has every other ``**`` value. No name is
+        substituted, so ``**opts`` is always opaque.
+        """
+        named: list[tuple[str, ast.expr]] = []
+        opaque: list[ast.expr] = []
+        for keyword in call.keywords:
+            if keyword.arg is not None:
+                named.append((keyword.arg, keyword.value))
+                continue
+            spelled = self.facts.literal_keywords(keyword.value)
+            if spelled is None:
+                opaque.append(keyword.value)
+            else:
+                named.extend(spelled)
+        return named, opaque
 
     def calls(self) -> list[ast.Call]:
         """Every call in the module, in source order."""
@@ -179,10 +203,6 @@ def _number(node: ast.expr) -> float | None:
     return None
 
 
-def _kwarg(call: ast.Call, name: str) -> ast.keyword | None:
-    return next((kw for kw in call.keywords if kw.arg == name), None)
-
-
 # --- collectors --------------------------------------------------------------
 
 
@@ -224,48 +244,66 @@ def _timeout_too_long(value: ast.expr, limit_ms: int) -> bool:
     return number is None or number == 0 or number > limit_ms
 
 
+def _timeout_setter_uses(module: _Module) -> list[_Hit]:
+    """A timeout setter used as a value (``wait = page.set_default_timeout``).
+
+    The call through the alias isn't recognizable, so the use itself is the
+    hit; the setter named as a call's ``func`` is checked by its arguments.
+    """
+    called = {id(call.func) for call in module.calls()}
+    return [
+        _Hit(_key(node), node.lineno, f"timeout setter {node.attr} used as a value")
+        for node in ast.walk(module.tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.ctx, ast.Load)
+        and node.attr in TIMEOUT_SETTERS
+        and id(node) not in called
+    ]
+
+
 def _longer_timeouts(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
         func = call.func
         name = call_name(call)
-        value: ast.expr | None = None
+        named, opaque = module.keywords(call)
+        timeouts = [value for key, value in named if key == "timeout"]
         limit = DEFAULT_TIMEOUT_MS
-        kind = module.kind(call)
-        # The setters count on any receiver (the stricter reading); an
-        # ``expect`` held in a name makes ``set_options`` setup too.
-        is_expect_setup = name == "set_options" and (
-            kind is not None or (isinstance(func, ast.Attribute) and is_expect_ref(func.value))
-        )
+        classified = module.kind(call) is not None
+        # The setters count on any receiver (the stricter reading), and so
+        # does ``set_options``, whichever name the ``expect`` goes by.
         if isinstance(func, ast.Attribute) and name in DEFAULT_TIMEOUT_SETTERS:
-            keyword = _kwarg(call, "timeout")
-            value = call.args[0] if call.args else (keyword.value if keyword else None)
-        elif is_expect_setup:
-            keyword = _kwarg(call, "timeout")
-            value = keyword.value if keyword else None
+            classified = True
+            if call.args:
+                timeouts = [call.args[0]]
+        elif isinstance(func, ast.Attribute) and name == "set_options":
+            classified = True
             limit = DEFAULT_ASSERTION_TIMEOUT_MS
-        else:
-            keyword = _kwarg(call, "timeout")
-            if keyword is not None and kind is not None:
-                value = keyword.value
-                if kind == KIND_ASSERTION:
-                    limit = DEFAULT_ASSERTION_TIMEOUT_MS
-        if value is not None and _timeout_too_long(value, limit):
+        elif module.kind(call) == KIND_ASSERTION:
+            limit = DEFAULT_ASSERTION_TIMEOUT_MS
+        # A call that isn't a step still waits as long as it is told to, so
+        # an explicit ``timeout=`` is checked against the default there too.
+        value = next((v for v in timeouts if _timeout_too_long(v, limit)), None)
+        if value is not None:
             hits.append(_Hit(_key(call), call.lineno, f"timeout {_key(value)} on {name}"))
-    return hits
+        elif classified and opaque:
+            # No substitution here: ``**opts`` may hold any timeout.
+            hits.append(_Hit(_key(call), call.lineno, f"opaque **kwargs on {name}"))
+    hits.extend(_timeout_setter_uses(module))
+    return sorted(hits, key=lambda h: h.line)
 
 
 def _forces(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
-        keyword = _kwarg(call, "force")
-        is_false = (
-            keyword is not None
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value is False
-        )
-        if keyword is not None and not is_false:
-            hits.append(_Hit(_key(call), call.lineno, f"force={_key(keyword.value)}"))
+        named, _ = module.keywords(call)
+        forced = [
+            value
+            for key, value in named
+            if key == "force" and not (isinstance(value, ast.Constant) and value.value is False)
+        ]
+        if forced:
+            hits.append(_Hit(_key(call), call.lineno, f"force={_key(forced[0])}"))
         elif isinstance(call.func, ast.Attribute) and call.func.attr == "dispatch_event":
             hits.append(_Hit(_key(call), call.lineno, "dispatch_event call"))
     return hits
