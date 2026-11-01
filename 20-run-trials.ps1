@@ -21,7 +21,9 @@
     Each trial is a real model call and costs money (about $0.01-$0.08 on
     Eval 01), so run -SelfTest first after any launcher change; it is one
     cheap run that takes no case. Only the edit-only tool profile and no
-    context files (--safe-mode) are supported.
+    context files (--safe-mode) are supported. The edit-only profile is the
+    seven built-in tools Read, Glob, Grep, Edit, Write, Bash and PowerShell
+    (no web tools), with Edit and Write limited to the case's script.
 
     When the batch finishes it prints the 30-grade-trials.ps1 command that
     grades it.

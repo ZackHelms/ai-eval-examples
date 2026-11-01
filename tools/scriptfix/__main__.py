@@ -167,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
     how_many.add_argument("--runs", type=_runs_arg, default=None, help="run exactly these numbers: 13 or 1,3,5-7 (none may exist yet)")
     runner.add_argument("--effort", choices=EFFORTS, default="default", help="claude's --effort; default omits the flag (default: default)")
     runner.add_argument("--context", choices=CONTEXTS, default="none", help="context files given to the subject (default: none)")
-    runner.add_argument("--tools", choices=TOOLS, default="edit-only", help="the subject's tool profile (default: edit-only)")
+    runner.add_argument("--tools", choices=TOOLS, default="edit-only", help="the subject's tool profile (default: edit-only): the built-in tools Read, Glob, Grep, Edit, Write, Bash and PowerShell, with Edit and Write limited to the case's script; no web tools")
     runner.add_argument(
         "--trials-root",
         type=Path,

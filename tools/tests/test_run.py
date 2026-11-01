@@ -20,6 +20,7 @@ import pytest
 from test_grade import World, edit_call, stream_log
 
 from scriptfix import __version__, run
+from scriptfix.grade import _read_subject
 from scriptfix.run import (
     EFFORTS,
     SELF_TEST_MODEL,
@@ -403,6 +404,8 @@ def test_claude_argv_without_effort(tmp_path: Path) -> None:
         "Fix the script.\nThen stop.",
         "--safe-mode",
         "--strict-mcp-config",
+        "--tools",
+        "Read,Glob,Grep,Edit,Write,Bash,PowerShell",
         "--model",
         "claude-haiku-5-5",
         "--permission-mode",
@@ -431,6 +434,20 @@ def test_claude_argv_puts_the_prompt_right_after_dash_p(tmp_path: Path) -> None:
     # The variadic --allowedTools holds exactly the two rules, then the next flag.
     start = argv.index("--allowedTools")
     assert argv[start + 3] == "--output-format"
+
+
+def test_claude_argv_puts_tools_after_the_prompt_and_before_a_flag(tmp_path: Path) -> None:
+    for effort in ("default", "high"):
+        argv = argv_for(effort, tmp_path)
+        at = argv.index("--tools")
+        assert argv.index("-p") + 1 < at < argv.index("--model")
+        assert argv[at + 1] == ",".join(run.TRIAL_TOOLS)  # one comma-separated value
+        assert argv[at + 2].startswith("--")  # variadic: it must be followed by a flag
+        assert argv.count("--tools") == 1
+
+
+def test_trial_tools_are_the_seven_without_web_tools() -> None:
+    assert run.TRIAL_TOOLS == ("Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell")
 
 
 def test_claude_argv_defaults_to_the_default_permission_mode() -> None:
@@ -775,7 +792,8 @@ def test_a_good_trial(world: World, fake: FakeClaude) -> None:
 
     sidecar = json.loads((root / "01-run1.subject.json").read_text(encoding="utf-8"))
     assert list(sidecar) == [
-        "run", "case", "model", "effort", "context", "tools", "runner", "started", "seconds", "exit_code", "timed_out",
+        "run", "case", "model", "effort", "context", "tools", "tool_list", "runner", "started", "seconds", "exit_code",
+        "timed_out",
     ]  # fmt: skip
     assert sidecar | {"seconds": 0} == {
         "run": 1,
@@ -784,6 +802,7 @@ def test_a_good_trial(world: World, fake: FakeClaude) -> None:
         "effort": "default",
         "context": "none",
         "tools": "edit-only",
+        "tool_list": ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell"],
         "runner": __version__,
         "started": "2026-11-01T10:00:00",
         "seconds": 0,
@@ -800,6 +819,16 @@ def test_a_good_trial(world: World, fake: FakeClaude) -> None:
     assert line_with(out, "NEXT=") == f"NEXT={next_command(world.case_dir, [1], root)}"
     assert "-Runs 1 -TrialsRoot " in line_with(out, "NEXT=")
     assert not any(line.startswith("HARNESS=") for line in out)
+
+
+def test_a_launched_trials_sidecar_records_the_tool_list(world: World, fake: FakeClaude) -> None:
+    good_trial(fake)
+    assert go(world, fake, []) == 0
+    sidecar = json.loads((world.trials_root / "01-run1.subject.json").read_text(encoding="utf-8"))
+    assert sidecar["tool_list"] == list(run.TRIAL_TOOLS)
+    assert sidecar["tools"] == "edit-only"  # the label the grader keys on is unchanged
+    # The same file the launcher wrote still loads in the grader, extra key and all.
+    assert _read_subject(world.trials_root / "01-run1.subject.json") == ("default", "none", "edit-only")
 
 
 def test_the_child_sees_the_documented_argv_cwd_and_env(
@@ -1018,6 +1047,9 @@ def test_dry_run_still_rejects_an_existing_run(world: World, fake: FakeClaude) -
 # --------------------------------------------------------------------------
 
 
+SESSION_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell"]
+
+
 def selftest_log(
     *,
     ps_text: str = r"C:\trial\01",
@@ -1026,6 +1058,8 @@ def selftest_log(
     denials: tuple[str, ...] = (),
     result: bool = True,
     result_error: bool = False,
+    init_tools: list[str] | None = None,
+    init: bool = True,
 ) -> list[dict[str, Any]]:
     uses = [
         {"type": "tool_use", "id": "t1", "name": "PowerShell", "input": {"command": "Get-Location"}},
@@ -1038,10 +1072,21 @@ def selftest_log(
         {"type": "tool_result", "tool_use_id": "t3", "is_error": False, "content": "edited"},
     ]
     lines: list[dict[str, Any]] = [
-        {"type": "system", "subtype": "init", "model": "m", "claude_code_version": "9", "session_id": "s"},
         {"type": "assistant", "message": {"role": "assistant", "content": uses}},
         {"type": "user", "message": {"role": "user", "content": answers}},
     ]
+    if init:
+        lines.insert(
+            0,
+            {
+                "type": "system",
+                "subtype": "init",
+                "model": "m",
+                "claude_code_version": "9",
+                "session_id": "s",
+                "tools": SESSION_TOOLS if init_tools is None else init_tools,
+            },
+        )
     if result:
         lines.append(
             {
@@ -1164,6 +1209,67 @@ def test_self_test_fails_on_a_missing_result_line(world: World, fake: FakeClaude
     out: list[str] = []
     assert selftest(world, fake, out) == 1
     assert "REASON=result: the log has no result line" in out
+
+
+def reasons_of(out: list[str]) -> list[str]:
+    return [line for line in out if line.startswith("REASON=")]
+
+
+def test_self_test_passes_with_exactly_the_seven_tools_in_any_order(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake, init_tools=list(reversed(SESSION_TOOLS)))
+    out: list[str] = []
+    assert selftest(world, fake, out) == 0
+    assert reasons_of(out) == []
+
+
+def test_self_test_argv_carries_the_tool_allowlist(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake)
+    assert selftest(world, fake, []) == 0
+    argv = fake.calls()[0]["argv"]
+    assert argv[argv.index("--tools") + 1] == "Read,Glob,Grep,Edit,Write,Bash,PowerShell"
+
+
+def test_self_test_fails_when_the_init_line_adds_a_tool(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake, init_tools=[*SESSION_TOOLS, "WebSearch"])
+    out: list[str] = []
+    assert selftest(world, fake, out) == 1
+    assert reasons_of(out) == ["REASON=tools: extra: WebSearch; missing: none"]
+
+
+def test_self_test_fails_when_the_init_line_misses_a_tool(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake, init_tools=[tool for tool in SESSION_TOOLS if tool != "PowerShell"])
+    out: list[str] = []
+    assert selftest(world, fake, out) == 1
+    assert reasons_of(out) == ["REASON=tools: extra: none; missing: PowerShell"]
+
+
+def test_self_test_fails_when_there_is_no_init_line(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake, init=False)
+    out: list[str] = []
+    assert selftest(world, fake, out) == 1
+    (reason,) = reasons_of(out)
+    assert reason.startswith("REASON=tools: ")
+
+
+def test_self_test_reports_the_tools_check_last(world: World, fake: FakeClaude) -> None:
+    good_selftest(fake, bash_error=True, init_tools=[*SESSION_TOOLS, "WebFetch"])
+    out: list[str] = []
+    assert selftest(world, fake, out) == 1
+    assert [line.split(":")[0] for line in reasons_of(out)] == ["REASON=bash", "REASON=tools"]
+
+
+def test_init_tools_reads_the_first_init_line(tmp_path: Path) -> None:
+    log = tmp_path / "log.jsonl"
+    lines = [
+        {"type": "system", "subtype": "hook"},
+        {"type": "system", "subtype": "init", "tools": ["Read"]},
+        {"type": "system", "subtype": "init", "tools": ["Bash"]},
+    ]
+    log.write_text("".join(json.dumps(line) + "\n" for line in lines), encoding="utf-8", newline="\n")
+    assert run._init_tools(log) == ["Read"]
+    assert run._init_tools(tmp_path / "missing.jsonl") is None
+    log.write_text(json.dumps({"type": "system", "subtype": "init", "tools": "Read"}) + "\n", encoding="utf-8")
+    assert run._init_tools(log) is None
 
 
 def test_self_test_fails_on_a_non_zero_exit(world: World, fake: FakeClaude) -> None:
