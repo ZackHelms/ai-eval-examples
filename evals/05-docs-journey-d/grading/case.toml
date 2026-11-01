@@ -1,0 +1,7 @@
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["missing-step"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The click on Next Other locators » is missing, so the Previous « Network check runs on the Network page (line 19)."
+fails_at = 19
+target   = "https://playwright.dev"
