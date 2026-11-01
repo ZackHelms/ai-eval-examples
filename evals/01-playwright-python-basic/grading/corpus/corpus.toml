@@ -92,3 +92,15 @@ tags = ["weakened-check"]
 
 [files."ok-annotated-set-clear.py"]
 tags = []
+
+[files."ok-module-constant.py"]
+tags = []
+
+[files."zero-getattr-goto.py"]
+tags = ["changed-journey"]
+
+[files."zero-visible-false.py"]
+tags = ["weakened-check"]
+
+[files."judge-module-constant-globals.py"]
+tags = ["retargeted"]

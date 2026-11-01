@@ -777,15 +777,6 @@ def test_a_nested_function_does_not_see_the_enclosing_scope() -> None:
     assert steps_of(source)[0].target == "link"
 
 
-def test_module_names_are_not_substituted_inside_functions() -> None:
-    source = """
-        URL = "https://example.test/"
-        def run(page):
-            page.goto(URL)
-    """
-    assert steps_of(source)[0].values == ("URL",)
-
-
 def test_lambda_parameter_shadows_a_substitutable_name() -> None:
     source = """
         loc = page.locator("a")
@@ -800,3 +791,323 @@ def test_comprehension_variable_shadows_a_substitutable_name() -> None:
         [loc.click() for loc in items]
     """
     assert steps_of(source)[0].target == "loc"
+
+
+# --- module constants ---------------------------------------------------------
+
+
+def goto_values(source: str) -> list[tuple[str, ...]]:
+    return [step.values for step in steps_of(source) if step.name == "goto"]
+
+
+def without_lines(source: str) -> list[tuple[str, str, str, tuple[str, ...], tuple]]:
+    """The steps of ``source`` less their line numbers, to compare differently laid-out sources."""
+    return [(s.kind, s.name, s.target, s.values, s.options) for s in steps_of(source)]
+
+
+def test_module_constant_substitutes_into_a_function() -> None:
+    constant = """
+        URL = "https://x/"
+
+        async def run(page):
+            await page.goto(URL)
+    """
+    literal = """
+        async def run(page):
+            await page.goto("https://x/")
+    """
+    assert without_lines(constant) == without_lines(literal)
+    assert goto_values(constant) == [("'https://x/'",)]
+
+
+@pytest.mark.parametrize("literal", ["7", "1.5", '"text"'])
+def test_module_constant_may_be_a_str_int_or_float(literal: str) -> None:
+    source = f"""
+        VALUE = {literal}
+
+        def run(page):
+            page.fill("#a", VALUE)
+    """
+    assert steps_of(source)[0].values == ("'#a'", literal.replace('"', "'"))
+
+
+@pytest.mark.parametrize("value", ["True", "None", 'b"x"', "make_url()", '"a" + "b"', '["a"]'])
+def test_module_name_that_is_not_a_scalar_constant_does_not_substitute(value: str) -> None:
+    source = f"""
+        URL = {value}
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("URL",)]
+
+
+def test_module_constant_assigned_twice_does_not_substitute() -> None:
+    source = """
+        URL = "https://x/"
+        URL = "https://y/"
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("URL",)]
+
+
+def test_module_constant_declared_global_anywhere_does_not_substitute() -> None:
+    source = """
+        URL = "https://x/"
+
+        def retarget():
+            global URL
+            URL = "https://y/"
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("URL",)]
+
+
+def test_function_binding_of_a_module_constant_name_wins() -> None:
+    source = """
+        URL = "https://x/"
+
+        def run(page):
+            URL = "https://y/"
+            page.goto(URL)
+
+        def other(page, URL):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("'https://y/'",), ("URL",)]
+
+
+def test_module_constant_is_shadowed_by_an_enclosing_function() -> None:
+    source = """
+        URL = "https://x/"
+
+        def outer(page):
+            URL = make_url()
+
+            def inner():
+                page.goto(URL)
+    """
+    assert goto_values(source) == [("URL",)]
+
+
+def test_module_constant_reaches_nested_functions_and_methods() -> None:
+    source = """
+        URL = "https://x/"
+
+        def outer(page):
+            def inner():
+                page.goto(URL)
+
+        class Runner:
+            def run(self, page):
+                page.goto(URL)
+    """
+    assert goto_values(source) == [("'https://x/'",), ("'https://x/'",)]
+
+
+@pytest.mark.parametrize(
+    "call", ["globals()", "vars()", "setattr(m, 'n', 1)", "exec(code)", "eval(code)"]
+)
+def test_module_that_can_rebind_names_invisibly_has_no_module_constants(call: str) -> None:
+    source = f"""
+        URL = "https://x/"
+        {call}
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("URL",)]
+
+
+def test_module_without_dynamic_name_calls_keeps_its_module_constants() -> None:
+    source = """
+        URL = "https://x/"
+        print(globals_report)
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("'https://x/'",)]
+
+
+def test_dynamic_name_must_be_a_bare_call_to_block_module_constants() -> None:
+    source = """
+        URL = "https://x/"
+        report.globals()
+
+        def run(page):
+            page.goto(URL)
+    """
+    assert goto_values(source) == [("'https://x/'",)]
+
+
+# --- ``**`` arguments that spell out their keywords ----------------------------
+
+
+def test_double_star_dict_display_splits_like_explicit_keywords() -> None:
+    spelled = steps_of('page.get_by_role("link").click(**{"timeout": 5000})')
+    explicit = steps_of('page.get_by_role("link").click(timeout=5000)')
+    assert spelled == explicit
+    assert spelled[0].options == (("timeout", "5000"),)
+
+
+def test_double_star_dict_splits_options_and_named_values() -> None:
+    spelled = steps_of('page.fill("#a", "x", **{"timeout": 5000, "no_wait_after": True})')
+    explicit = steps_of('page.fill("#a", "x", timeout=5000, no_wait_after=True)')
+    assert spelled == explicit
+    named = steps_of('page.select_option("#a", **{"label": "A"})')
+    assert named == steps_of('page.select_option("#a", label="A")')
+
+
+def test_double_star_dict_held_in_a_name_assigned_once_splits() -> None:
+    source = """
+        opts = {"timeout": 5000}
+        page.get_by_role("link").click(**opts)
+    """
+    assert without_lines(source) == without_lines('page.get_by_role("link").click(timeout=5000)')
+
+
+def test_double_star_dict_held_in_a_name_assigned_twice_stays_opaque() -> None:
+    source = """
+        opts = {"timeout": 5000}
+        opts = {"timeout": 1}
+        page.get_by_role("link").click(**opts)
+    """
+    step = steps_of(source)[0]
+    assert step.values == ("**opts",)
+    assert step.options == ()
+
+
+@pytest.mark.parametrize(
+    "unpacked, expected",
+    [
+        ("{**a}", "**{**a}"),
+        ("{k: 1}", "**{k: 1}"),
+        ('{"timeout": 1, **a}', "**{'timeout': 1, **a}"),
+        ('{"timeout": 1, "timeout": 2}', "**{'timeout': 1, 'timeout': 2}"),
+        ("opts", "**opts"),
+        ("make_options()", "**make_options()"),
+    ],
+)
+def test_double_star_that_may_hold_other_keys_stays_an_opaque_value(
+    unpacked: str, expected: str
+) -> None:
+    step = steps_of(f"page.get_by_role('link').click(**{unpacked})")[0]
+    assert step.values == (expected,)
+    assert step.options == ()
+
+
+def test_double_star_dict_call_splits_like_the_dict_display() -> None:
+    spelled = steps_of('page.get_by_role("link").click(**dict(timeout=5000))')
+    assert spelled == steps_of('page.get_by_role("link").click(timeout=5000)')
+    assert spelled == steps_of('page.get_by_role("link").click(**{"timeout": 5000})')
+
+
+@pytest.mark.parametrize(
+    "setup, call",
+    [
+        ("dict = make_dict", "dict(timeout=5000)"),
+        ("def f(dict): pass", "dict(timeout=5000)"),
+        ("from helpers import *", "dict(timeout=5000)"),
+        ("", "dict({'timeout': 5000})"),
+        ("", "dict(other, timeout=5000)"),
+        ("", "dict(**other)"),
+        ("", "dict(timeout=5000, **other)"),
+    ],
+)
+def test_double_star_dict_call_that_may_hold_other_keys_stays_opaque(setup: str, call: str) -> None:
+    step = steps_of(f"{setup}\npage.get_by_role('link').click(**{call})")[0]
+    assert step.options == ()
+    assert step.values[0].startswith("**")
+
+
+# --- ``getattr(<expr>, "<name>")`` ---------------------------------------------
+
+
+def test_getattr_with_a_literal_name_is_the_attribute() -> None:
+    spelled = steps_of('getattr(page, "goto")("https://x/")')
+    assert spelled == steps_of('page.goto("https://x/")')
+    assert kinds_and_names('getattr(page.locator("a"), "click")()') == [(KIND_ACTION, "click")]
+
+
+def test_getattr_attribute_keeps_the_call_key_of_the_raw_call() -> None:
+    tree = ast.parse('async def run(page):\n    await getattr(page, "goto")("https://x/")\n')
+    call = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Call)
+    )
+    assert classify_module(tree)[call_key(call)] == KIND_NAVIGATION
+
+
+def test_getattr_of_a_matcher_is_the_assertion() -> None:
+    source = 'getattr(expect(page.locator("a")), "to_be_visible")()'
+    assert steps_of(source) == steps_of('expect(page.locator("a")).to_be_visible()')
+
+
+@pytest.mark.parametrize(
+    "setup, call",
+    [
+        ("", 'getattr(page, "goto", None)("https://x/")'),
+        ("", 'getattr(page, "goto", default=None)("https://x/")'),
+        ("", 'getattr(page, "go-to")("https://x/")'),
+        ("", 'getattr(page, name)("https://x/")'),
+        ("", 'getattr(page, b"goto")("https://x/")'),
+        ("", 'getattr(page)("https://x/")'),
+        ("getattr = make_getattr", 'getattr(page, "goto")("https://x/")'),
+        ("def f(getattr): pass", 'getattr(page, "goto")("https://x/")'),
+        ("from helpers import *", 'getattr(page, "goto")("https://x/")'),
+    ],
+)
+def test_getattr_that_is_not_the_plain_two_argument_form_is_not_a_step(
+    setup: str, call: str
+) -> None:
+    assert steps_of(f"{setup}\n{call}") == []
+
+
+# --- boolean state keywords on matchers ---------------------------------------
+
+
+@pytest.mark.parametrize("state", ["visible", "checked", "enabled", "editable", "attached"])
+def test_matcher_state_false_is_the_negated_matcher(state: str) -> None:
+    spelled = steps_of(f'expect(page.locator("a")).to_be_{state}({state}=False)')
+    assert spelled == steps_of(f'expect(page.locator("a")).not_to_be_{state}()')
+    flipped = steps_of(f'expect(page.locator("a")).not_to_be_{state}({state}=False)')
+    assert flipped == steps_of(f'expect(page.locator("a")).to_be_{state}()')
+
+
+@pytest.mark.parametrize("state", ["visible", "checked", "enabled", "editable", "attached"])
+def test_matcher_state_true_is_the_default(state: str) -> None:
+    for prefix in ("to_be", "not_to_be"):
+        spelled = steps_of(f'expect(page.locator("a")).{prefix}_{state}({state}=True)')
+        assert spelled == steps_of(f'expect(page.locator("a")).{prefix}_{state}()')
+
+
+def test_matcher_state_keeps_other_keywords() -> None:
+    spelled = steps_of('expect(page.locator("a")).to_be_visible(visible=False, timeout=1000)')
+    plain = steps_of('expect(page.locator("a")).not_to_be_visible(timeout=1000)')
+    assert spelled == plain
+    assert spelled[0].options == (("timeout", "1000"),)
+
+
+def test_matcher_state_that_is_not_a_literal_boolean_stays() -> None:
+    for value in ("flag", "0", "None", "not True"):
+        step = steps_of(f'expect(page.locator("a")).to_be_visible(visible={value})')[0]
+        assert step.name == "to_be_visible"
+        assert step.values == (f"visible={value}",)
+
+
+def test_matcher_state_on_a_matcher_without_one_is_untouched() -> None:
+    step = steps_of('expect(page.locator("a")).to_have_text("x", visible=False)')[0]
+    assert step.name == "to_have_text"
+    assert step.values == ("'x'", "visible=False")
+
+
+def test_matcher_state_keeps_the_call_key_of_the_raw_call() -> None:
+    tree = ast.parse('expect(page.locator("a")).to_be_visible(visible=False)')
+    matcher = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.Call) and call_name(n) == "to_be_visible"
+    )
+    assert classify_module(tree)[call_key(matcher)] == KIND_ASSERTION

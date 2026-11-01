@@ -139,6 +139,16 @@ PLAIN_CONSTRUCTORS = frozenset(
         "filter",
     }
 )
+# Built-ins the normalization rewrites by name (``getattr(x, "n")`` and
+# ``dict(k=v)``); like PLAIN_CONSTRUCTORS, only while the module doesn't rebind them.
+GETATTR_NAME = "getattr"
+_TRACKED_BUILTINS = PLAIN_CONSTRUCTORS | {GETATTR_NAME}
+# A module that calls any of these by bare name could rebind a module name
+# without a visible assignment, so none of its module names count as constants.
+DYNAMIC_NAME_CALLS = frozenset({"globals", "vars", "setattr", "exec", "eval"})
+# Matchers with a boolean state keyword: ``to_be_<x>(<x>=False)`` is
+# ``not_to_be_<x>()`` and ``<x>=True`` is the default.
+STATE_MATCHERS = frozenset({"visible", "checked", "enabled", "editable", "attached"})
 # Kinds an unawaited expression statement in an ``async def`` doesn't run:
 # in the async API they are coroutines (setup and waits keep their kind).
 _COROUTINE_KINDS = frozenset({KIND_NAVIGATION, KIND_ACTION, KIND_ASSERTION})
@@ -253,6 +263,11 @@ def classify_module(tree: ast.Module) -> dict[CallKey, str]:
     - An action with ``trial=`` anything but ``False`` only runs Playwright's
       actionability checks: not a step.
     - Markers are recognized on ``with`` items only, bare or not.
+    - ``getattr(<expr>, "<name>")(...)`` (two arguments, a literal identifier,
+      ``getattr`` never rebound) is read as ``<expr>.<name>(...)``.
+    - Module constants (``NAME = "text"``, bound once, never ``global``, and
+      no ``globals()``/``vars()``/``setattr()``/``exec()``/``eval()`` call in
+      the module) substitute into functions that don't bind the name.
 
     No I/O; ``tree`` isn't modified.
     """
@@ -271,16 +286,19 @@ def extract_steps(source: str) -> list[Step]:
 
 
 def _walk(tree: ast.Module) -> _Extractor:
-    extractor = _Extractor(_ModuleFacts.of(tree))
+    facts = _ModuleFacts.of(tree)
+    extractor = _Extractor(facts)
     # A ``global`` declaration anywhere lets a function rebind a module name,
-    # so those names are never substituted at module level.
+    # so those names are never substituted at module level, and never stand
+    # in as constants inside functions.
     module_rebound = [
         name
         for node in ast.walk(tree)
         if isinstance(node, ast.Global)
         for name in node.names
     ]
-    extractor.scope(tree.body, module_rebound)
+    extractor.constants = {} if facts.dynamic_names else _module_constants(tree, module_rebound)
+    extractor.scope(tree.body, module_rebound, is_module=True)
     return extractor
 
 
@@ -328,8 +346,10 @@ class _ModuleFacts:
 
     # The bare name ``expect`` is Playwright's.
     playwright_expect: bool
-    # The PLAIN_CONSTRUCTORS names that may not be the built-ins.
+    # The PLAIN_CONSTRUCTORS names (and ``getattr``) that may not be the built-ins.
     rebound_builtins: frozenset[str]
+    # The module calls one of DYNAMIC_NAME_CALLS by bare name.
+    dynamic_names: bool = False
 
     @classmethod
     def of(cls, tree: ast.Module) -> _ModuleFacts:
@@ -338,10 +358,16 @@ class _ModuleFacts:
         # import from Playwright binds Playwright's ``expect``.
         playwright_expect = all(plain for name, plain in bindings if name in (EXPECT_NAME, "*"))
         if any(name == "*" and not plain for name, plain in bindings):
-            rebound = PLAIN_CONSTRUCTORS
+            rebound = _TRACKED_BUILTINS
         else:
-            rebound = PLAIN_CONSTRUCTORS & {name for name, _ in bindings}
-        return cls(playwright_expect, frozenset(rebound))
+            rebound = _TRACKED_BUILTINS & {name for name, _ in bindings}
+        dynamic = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in DYNAMIC_NAME_CALLS
+            for node in ast.walk(tree)
+        )
+        return cls(playwright_expect, frozenset(rebound), dynamic)
 
     def is_expect_ref(self, node: ast.AST) -> bool:
         """``is_expect_ref``, but a bare ``expect`` only when it's Playwright's."""
@@ -362,6 +388,55 @@ class _ModuleFacts:
             and receiver.func.id in PLAIN_CONSTRUCTORS
             and receiver.func.id not in self.rebound_builtins
         )
+
+    def getattr_name(self, call: ast.Call) -> str | None:
+        """The attribute name when ``call`` is ``getattr(<expr>, "<name>")``, else ``None``.
+
+        Only the two-argument form with a string-constant identifier counts,
+        and only while the module never rebinds ``getattr``.
+        """
+        if not (
+            isinstance(call.func, ast.Name)
+            and call.func.id == GETATTR_NAME
+            and GETATTR_NAME not in self.rebound_builtins
+            and len(call.args) == 2
+            and not call.keywords
+            and not isinstance(call.args[0], ast.Starred)
+        ):
+            return None
+        name = call.args[1]
+        if isinstance(name, ast.Constant) and isinstance(name.value, str):
+            return name.value if name.value.isidentifier() else None
+        return None
+
+    def literal_keywords(self, value: ast.expr) -> list[tuple[str, ast.expr]] | None:
+        """The keywords a ``**`` value spells out, or ``None`` when it may hold others.
+
+        A dict display whose keys are all distinct string constants, or a
+        ``dict(k=v, ...)`` call of the unrebound built-in with no positional
+        arguments and no ``**``, is exactly those keywords.
+        """
+        if isinstance(value, ast.Dict):
+            keys = value.keys
+            names = [
+                key.value
+                for key in keys
+                if isinstance(key, ast.Constant) and isinstance(key.value, str)
+            ]
+            # A ``**`` inside the display has a ``None`` key, which isn't a name.
+            if len(names) != len(keys) or len(set(names)) != len(names):
+                return None
+            return list(zip(names, value.values))
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "dict"
+            and "dict" not in self.rebound_builtins
+            and not value.args
+            and all(keyword.arg is not None for keyword in value.keywords)
+        ):
+            return [(str(keyword.arg), keyword.value) for keyword in value.keywords]
+        return None
 
 
 # --- substitution of local names -------------------------------------------
@@ -533,27 +608,59 @@ def _substitutable_value(value: ast.expr) -> bool:
     return True
 
 
+def _is_scalar_constant(value: ast.expr | None) -> bool:
+    """A str, int or float literal (not bool, bytes, complex or ``None``)."""
+    return isinstance(value, ast.Constant) and type(value.value) in (str, int, float)
+
+
+def _module_constants(tree: ast.Module, global_names: Iterable[str]) -> dict[str, ast.expr]:
+    """The module names that stand in for their value inside function scopes.
+
+    A name qualifies iff its only binding in the module body is one plain
+    ``NAME = <str/int/float literal>`` and no ``global`` declaration anywhere
+    names it. Anything else at module level (calls, containers, a second
+    assignment) doesn't substitute into functions.
+    """
+    collector = _BindingCollector()
+    for statement in tree.body:
+        collector.visit(statement)
+    blocked = frozenset(global_names)
+    return {
+        name: bindings[0]  # type: ignore[misc]
+        for name, bindings in collector.bindings.items()
+        if len(bindings) == 1 and name not in blocked and _is_scalar_constant(bindings[0])
+    }
+
+
 def _scope_substitutions(
-    body: list[ast.stmt], rebound: Iterable[str]
-) -> tuple[dict[str, ast.expr], dict[str, ast.Call]]:
+    body: list[ast.stmt], rebound: Iterable[str], inherited: dict[str, ast.expr]
+) -> tuple[dict[str, ast.expr], dict[str, ast.Call], dict[str, ast.expr]]:
     """Map each substitutable name of one scope to its assigned value.
 
     A name qualifies iff its only binding in the scope is a single plain
     ``name = <expr>`` (or ``name: T = <expr>``) and that value is
     substitutable. ``rebound`` names (parameters, module names declared
-    ``global`` elsewhere) are bindings too.
+    ``global`` elsewhere) are bindings too. ``inherited`` module constants
+    stand in as well, unless the scope binds the name itself (its own
+    binding wins and follows the rules above).
 
     The second map holds the names bound that way to an ``expect(...)``
     call. Those stand in only as a matcher's receiver, so ``check =
     expect(loc)`` then ``check.to_be_visible()`` is the inline assertion,
     while ``check`` elsewhere stays a name.
+
+    The third map is ``inherited`` less this scope's own names: what scopes
+    nested in this one may still inherit.
     """
     collector = _BindingCollector()
     for name in rebound:
         collector.other(name)
     for statement in body:
         collector.visit(statement)
-    substitutions: dict[str, ast.expr] = {}
+    inheritable = {
+        name: value for name, value in inherited.items() if name not in collector.bindings
+    }
+    substitutions: dict[str, ast.expr] = dict(inheritable)
     expectations: dict[str, ast.Call] = {}
     for name, bindings in collector.bindings.items():
         if len(bindings) == 1:
@@ -562,7 +669,7 @@ def _scope_substitutions(
                 substitutions[name] = value
             elif isinstance(value, ast.Call) and is_expect_call(value):
                 expectations[name] = value
-    return substitutions, expectations
+    return substitutions, expectations, inheritable
 
 
 class _Substituter(ast.NodeTransformer):
@@ -657,6 +764,38 @@ def _is_trial(call: ast.Call) -> bool:
     )
 
 
+def _canonical_matcher(call: ast.Call) -> ast.Call:
+    """``call`` with a literal boolean state keyword folded into the matcher.
+
+    ``to_be_visible(visible=False)`` is ``not_to_be_visible()`` (and the
+    ``not_to_…`` form flips back); ``visible=True`` is the default and is
+    dropped. Any other value of the keyword, or a matcher without the
+    keyword, comes back as it is. ``call.func`` must be an attribute.
+    """
+    func = call.func
+    assert isinstance(func, ast.Attribute)
+    negated = func.attr.startswith("not_")
+    base = func.attr.removeprefix("not_")
+    state = base.removeprefix("to_be_")
+    if state == base or state not in STATE_MATCHERS:
+        return call
+    flags = [keyword for keyword in call.keywords if keyword.arg == state]
+    if len(flags) != 1:
+        return call
+    flag = flags[0].value
+    if not (isinstance(flag, ast.Constant) and isinstance(flag.value, bool)):
+        return call
+    if flag.value is False:
+        negated = not negated
+    canonical = copy.copy(call)
+    canonical.keywords = [keyword for keyword in call.keywords if keyword is not flags[0]]
+    canonical.func = ast.Attribute(
+        value=func.value, attr=f"{'not_' if negated else ''}{base}", ctx=ast.Load()
+    )
+    ast.copy_location(canonical.func, func)
+    return canonical
+
+
 def _marker_label(call: ast.Call, normalize: Callable[[ast.AST], str]) -> str:
     """The first positional string constant, else the first argument normalized."""
     for arg in call.args:
@@ -674,6 +813,8 @@ class _Extractor:
         self.kinds: dict[CallKey, str] = {}
         self.substitutions: dict[str, ast.expr] = {}
         self.expectations: dict[str, ast.Call] = {}
+        # Module constants the current scope may still inherit (_module_constants).
+        self.constants: dict[str, ast.expr] = {}
         self.shadowed: frozenset[str] = frozenset()
         self.in_async = False  # walking an ``async def``'s own body
 
@@ -685,16 +826,43 @@ class _Extractor:
         return _Substituter(self.substitutions, self.shadowed, 0).visit(copy.deepcopy(node))
 
     def scope(
-        self, body: list[ast.stmt], rebound: Iterable[str], *, is_async: bool = False
+        self,
+        body: list[ast.stmt],
+        rebound: Iterable[str],
+        *,
+        is_async: bool = False,
+        is_module: bool = False,
     ) -> None:
-        """Walk one scope's body with that scope's substitutions only."""
-        saved = (self.substitutions, self.expectations, self.shadowed, self.in_async)
-        self.substitutions, self.expectations = _scope_substitutions(body, rebound)
+        """Walk one scope's body with that scope's substitutions only.
+
+        Module constants join a nested scope's substitutions unless that
+        scope (or one around it) binds the name; the module's own scope
+        substitutes its names by its own bindings, and hands the constants on.
+        """
+        saved = (
+            self.substitutions,
+            self.expectations,
+            self.constants,
+            self.shadowed,
+            self.in_async,
+        )
+        inherited = {} if is_module else self.constants
+        self.substitutions, self.expectations, inheritable = _scope_substitutions(
+            body, rebound, inherited
+        )
+        if not is_module:
+            self.constants = inheritable
         self.shadowed = frozenset()
         self.in_async = is_async
         for statement in body:
             self.visit(statement)
-        self.substitutions, self.expectations, self.shadowed, self.in_async = saved
+        (
+            self.substitutions,
+            self.expectations,
+            self.constants,
+            self.shadowed,
+            self.in_async,
+        ) = saved
 
     def visit_shadowed(self, nodes: Iterable[ast.AST], names: Iterable[str]) -> None:
         saved = self.shadowed
@@ -817,6 +985,7 @@ class _Extractor:
         or assertion is searched but isn't a step, and neither is an action
         with a ``trial=`` other than ``False``.
         """
+        call = self.canonical_call(call)
         func = call.func
         if not isinstance(func, ast.Attribute):
             return False
@@ -829,6 +998,9 @@ class _Extractor:
             return True
         if expectation is not None:
             target = ast.unparse(expectation.args[0]) if expectation.args else ""
+            call = _canonical_matcher(call)
+            func = call.func  # the matcher's canonical name
+            assert isinstance(func, ast.Attribute)
         else:
             target = ast.unparse(substituted)
         values, options = self.arguments(call)
@@ -836,20 +1008,54 @@ class _Extractor:
         self.steps.append(Step(kind, func.attr, target, values, options, call.lineno))
         return True
 
+    def canonical_call(self, call: ast.Call) -> ast.Call:
+        """``call``, with ``getattr(<expr>, "<name>")(...)`` read as ``<expr>.<name>(...)``.
+
+        The result keeps the call's position, so ``call_key`` still matches
+        the raw call the detectors look up.
+        """
+        inner = call.func
+        if not isinstance(inner, ast.Call):
+            return call
+        name = self.facts.getattr_name(inner)
+        if name is None:
+            return call
+        attribute = ast.Attribute(value=inner.args[0], attr=name, ctx=ast.Load())
+        ast.copy_location(attribute, inner)
+        canonical = copy.copy(call)
+        canonical.func = attribute
+        return canonical
+
     def arguments(self, call: ast.Call) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
-        """Split a call's arguments into normalized values and options."""
+        """Split a call's arguments into normalized values and options.
+
+        A ``**`` whose value spells out its keywords (a dict display with
+        string-constant keys, or ``dict(k=v, ...)``) is split like explicit
+        keywords; any other ``**<value>`` stays an opaque value.
+        """
         values = [self.normalize(arg) for arg in call.args]
         named: list[tuple[str, str]] = []
         unpacked: list[str] = []
         options: list[tuple[str, str]] = []
+        keywords: list[tuple[str | None, str]] = []
         for keyword in call.keywords:
-            value = self.normalize(keyword.value)
-            if keyword.arg is None:
-                unpacked.append(f"**{value}")
-            elif keyword.arg in OPTION_KWARGS:
-                options.append((keyword.arg, value))
+            spelled = (
+                self.facts.literal_keywords(self.substitute(keyword.value))
+                if keyword.arg is None
+                else None
+            )
+            if spelled is None:
+                keywords.append((keyword.arg, self.normalize(keyword.value)))
             else:
-                named.append((keyword.arg, value))
+                # Already substituted (and a nested name can't shadow here).
+                keywords.extend((name, ast.unparse(value)) for name, value in spelled)
+        for arg, value in keywords:
+            if arg is None:
+                unpacked.append(f"**{value}")
+            elif arg in OPTION_KWARGS:
+                options.append((arg, value))
+            else:
+                named.append((arg, value))
         values.extend(f"{name}={value}" for name, value in sorted(named))
         values.extend(unpacked)
         return tuple(values), tuple(sorted(options))
