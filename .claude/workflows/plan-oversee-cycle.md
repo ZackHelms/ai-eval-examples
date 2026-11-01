@@ -103,6 +103,20 @@ Learned on grader-01c's run (2026-11-01):
   never the break: the history and `.claude/` are readable on the trial
   host.
 
+Learned on grader-01d's run (2026-11-01):
+
+- **Docs edits go through the Edit/Write tools, never a script with
+  escapes.** A non-raw Python heredoc turned `.\20-run-trials.ps1` into
+  `.` + byte 0x10 + `-run-trials.ps1` (`\20` is an octal escape), and the
+  gate can't see it. Review doc diffs with `cat -A`, or run
+  `git grep -nP "[\x00-\x08\x0b\x0c\x0e-\x1f]" -- <files>`.
+- **Append to a file with the Edit tool in the worktree.** The guard
+  refuses `cat >> file <<'EOF'` as too complex to verify, even inside the
+  worktree.
+- **A live check is the overseer's to run.** The plan's one paid call (the
+  launcher self-test) was a single command; the overseer ran it and read
+  the log, which saved a spawn.
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task

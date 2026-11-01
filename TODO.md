@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **grader-01d: the trial runner** — oversee run of
-  `.claude/plans/grader-01d.trial-runner.md`, started 2026-11-01 with
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01d.trial-runner.md`
-  on branch `worktree-oversee+grader-01d`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -28,19 +25,11 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   02–06 (done 2026-11-01: `10-make-case.ps1`, `evals/02-docs-journey-a`
   to `evals/06-docs-journey-e`, the eval-integrity gate and the
   `eval-static-reviewer` agent, `.claude/plans/DONE/grader-01c.cases.md`)
-  → **next:** D trial runner (plan-ready, below) and E LLM judge (below;
-  independent of each other) → F pilot. Absorbs the former § Next items
-  Eval 01 grader, Capture script, Trial runner script and Eval: impossible
-  locator.
-- **grader-01 phase D: trial runner.** `20-run-trials.ps1` runs N
-  headless one-shot trials of a case, one at a time, with the launcher
-  gotchas built in. It writes a subject sidecar that the grader reads, and
-  `-SelfTest` checks the launcher for about $0.01. Context bundles are
-  deferred: `--safe-mode` disables CLAUDE.md. *Depends on:* phase B
-  (done); independent of C.
-
-  **Plan ready (2026-10-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01d.trial-runner.md`
+  → D trial runner (done 2026-11-01: `20-run-trials.ps1`, the subject
+  sidecar, `-SelfTest`, `.claude/plans/DONE/grader-01d.trial-runner.md`)
+  → **next:** E LLM judge (below) → F pilot. Absorbs the former § Next
+  items Eval 01 grader, Capture script, Trial runner script and Eval:
+  impossible locator.
 - **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
   (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
   escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
@@ -81,6 +70,31 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   evidence already did. Options: keep it (it isn't a product or work
   name); capture under a neutral local account; or wait for the isolated
   trial environment (§ Next) and capture there.
+- **Playtest: a smoke trial with the new runner** (grader-01d, 2026-11-01).
+  Run
+  `.\20-run-trials.ps1 -Case evals\02-docs-journey-a -Model claude-haiku-5-5 -Count 1`
+  (about $0.01), then the `NEXT=` command it prints. Check that:
+  - the trial folder holds only `prompt.md` and `inputs\`;
+  - the stream log's `init` line shows the requested model;
+  - `permission_denials` lists only what the model tried beyond editing
+    the script;
+  - the grade records the sidecar's subject.
+
+  The launcher's self-test already passed live
+  (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` item 9).
+- **The trial's tool profile is wider than edit-only** (grader-01d
+  follow-up, Deferred item 1). The subject's `init` line lists every
+  built-in tool: `Task`, `WebSearch`, `Monitor`, `Cron*`, `RemoteTrigger`,
+  `SendMessage` and more.
+  - Headless mode denies only what needs approval, so a tool that needs
+    none isn't stopped.
+  - Eval 01's 10 headless runs used only Read, Grep, Bash, PowerShell and
+    Edit.
+  - The options:
+    - (a) the runner passes `--disallowedTools` for everything except
+      Read, Glob, Grep, Edit, Write, Bash and PowerShell (recommended
+      before phase F's pilot);
+    - (b) keep the profile as is, and say what it allows in `trial-runs.md`.
 
 <!-- --- -->
 
@@ -116,8 +130,14 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   (`.claude/plans/DONE/grader-01c.cases.follow-up.md` § Deferred): four
   escalate-rule shapes that slip past the new rule, the untagged
   retarget after a path divergence, and `30-grade-trials.ps1`'s relative
-  `-Case` and exit-1 usage errors. The plan's anchors still match HEAD
-  (grader-01c didn't touch them). To fold these in, re-draft it first
+  `-Case` and exit-1 usage errors (`20-run-trials.ps1` already does both
+  right, like `10-make-case.ps1`). Also from grader-01d
+  (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` § Deferred
+  item 2): `test_line_endings.py` could fail on control characters in
+  tracked text files, which the gate missed once. grader-01d moved one
+  of the plan's anchors: `grade.py`'s `check_fair_play` call is now at
+  :406, not :369, so a re-draft (or the overseer's preflight) picks that
+  up. To fold these in, re-draft it first
   with `/zmh-producer:backlog-plan-gen` (recommended); otherwise they
   need a later plan.
 

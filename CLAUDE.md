@@ -77,8 +77,9 @@ one exists.
    versions changed (pins intact, no unmaintained or duplicate-purpose
    dependencies added).
 
-The trial-run loop: copy `prompt.md` + `inputs/` to a trial folder outside
-the repo, run the model headless, then grade against `grading/`: for
+The trial-run loop: `.\20-run-trials.ps1` copies `prompt.md` + `inputs/` to
+a trial folder outside the repo and runs the model headless, then grade
+against `grading/`: for
 script-fix cases, `.\30-grade-trials.ps1` (`.claude/skills/trial-runs.md`,
 `.claude/skills/scriptfix-grader.md`; see Playtest SOP below).
 
@@ -198,9 +199,8 @@ first-eval level-set>`.
   `.follow-up.md`/TODO.md).
 - **Publish SOP:** none. Authorization: n/a (no publish step).
 - **Playtest SOP:** for this repo, "playtest" means **trial-running an
-  eval** against a model, per `.claude/skills/trial-runs.md` (headless
-  `claude -p` from a trial folder outside the repo; `20-run-trials.ps1`
-  once grader-01 phase D lands). Every committed eval must be
+  eval** against a model, per `.claude/skills/trial-runs.md` (`.\20-run-trials.ps1`,
+  then `.\30-grade-trials.ps1`). Every committed eval must be
   trial-runnable.
 - **In-progress SOP:** yes — at most **one** `TODO.md` `## In progress`
   entry, opened before a multi-commit task begins and closed in its last

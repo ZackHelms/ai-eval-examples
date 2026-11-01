@@ -1,15 +1,29 @@
 # Skill: Trial-running an eval (headless Claude Code)
 
-How this repo runs a model on an eval (the Playtest SOP) until
-`20-run-trials.ps1` exists (grader-01 phase D); this file is also that
-script's spec. Learned on Eval 01's runs 1–12 (2026-10-29/30, Claude Code
-2.1.312–2.1.314).
+How this repo runs a model on an eval (the Playtest SOP): `20-run-trials.ps1`
+does it, and this file is the reasons behind the launcher. Learned on
+Eval 01's runs 1–12 (2026-10-29/30, Claude Code 2.1.312–2.1.314).
 
 ## Launch
 
-Copy `prompt.md` + `inputs/` to `~\eval-trials\<NN>-run<N>\` (outside the
-repo; the folder name carries only the number). With the repo venv active,
-from that folder:
+- `.\20-run-trials.ps1 -Case evals\<slug> -Model <id> -Count N` runs N new
+  trials. `-Runs 3-5` names runs instead; `-DryRun` prints the plan and
+  spends nothing.
+- `.\20-run-trials.ps1 -SelfTest` is the cheap harness check (gotcha 4).
+- Each trial leaves `<NN>-run<N>.stream.jsonl`, `<NN>-run<N>.stderr.txt` and
+  `<NN>-run<N>.subject.json` (the sidecar: model, effort, context, tools)
+  beside its folder. The grader reads the sidecar.
+- It never overwrites a trial: `-Runs` naming an existing one is a usage
+  error, and `-Count` starts after the highest run found.
+- The first harness problem stops the batch (a non-zero exit, a timeout, or
+  no `result` line): it prints a `HARNESS=` line and exits 1. Every batch
+  ends with a `NEXT=.\30-grade-trials.ps1 ...` line that grades it.
+- `--permission-mode default` still works on 2.1.314 although `--help` no
+  longer lists it; the runner keeps it.
+
+What it runs, for reference: it copies `prompt.md` + `inputs/` to
+`~\eval-trials\<NN>-run<N>\` (outside the repo; the folder name carries
+only the number), then from that folder:
 
 ```pwsh
 claude -p "<prompt.md text>" --safe-mode --strict-mcp-config --model <model> `
@@ -37,6 +51,8 @@ results and traces) never names the repo.
 
 ## Launcher gotchas (each one cost runs)
 
+Each gotcha below is handled by the script.
+
 1. **Use absolute allow rules** (`//c/...`). A relative rule
    (`Edit(./inputs/script.py)`) stops matching once the model runs
    `cd inputs`: Eval 01's runs 7 and 9 were denied their edit.
@@ -45,16 +61,25 @@ results and traces) never names the repo.
    `CLAUDE*`, plus `AI_AGENT`, `NO_COLOR`, `PYTHONIOENCODING`,
    `GIT_ASKPASS`, `GIT_EDITOR`, `GIT_TERMINAL_PROMPT`, `GCM_INTERACTIVE`,
    `COREPACK_ENABLE_AUTO_PIN`, `PSExecutionPolicyPreference`,
-   `NoDefaultCurrentDirectoryInExePath` and any plugin-injected variables.
+   `NoDefaultCurrentDirectoryInExePath` and any plugin-injected variables. The
+   runner also strips `ZMH3D_*`, `VIRTUAL_ENV`, `PYTHONPATH` and
+   `PYTHONSTARTUP`, and drops `PATH` entries inside the repo (its
+   `.venv\Scripts` too) and inside the stripped venv: they name the repo,
+   and the trial mustn't see it.
 3. **Put the real `pwsh.exe` first on `PATH`:**
    `$env:PATH = (Split-Path (Get-Process -Id $PID).Path) + ';' + $env:PATH`.
-   Through the WindowsApps app-execution alias, Claude Code's PowerShell
-   tool fails every command with "The command line is too long" (runs
-   7–9). Stripping variables does **not** fix this; only the `PATH` change
-   does.
-4. **Test a changed launcher** with a cheap harness run before spending
-   trials: one PowerShell command, `cd inputs` + one Bash command, one Edit
-   of a dummy file, then check all three results.
+   Through the per-user app-execution alias under
+   `%LOCALAPPDATA%\Microsoft\WindowsApps\`, Claude Code's PowerShell tool
+   fails every command with "The command line is too long" (runs 7–9).
+   Stripping variables does **not** fix this; only the `PATH` change does.
+   A store install's real `pwsh.exe`, under `C:\Program Files\WindowsApps\`,
+   is fine. The runner rejects only the alias, and the wrapper always passes
+   `--pwsh (Get-Process -Id $PID).Path`.
+4. **Test a changed launcher** with `.\20-run-trials.ps1 -SelfTest` before
+   spending trials: one PowerShell command, `cd inputs` + one Bash command,
+   one Edit of a dummy file. It prints `SELFTEST=pass` or names what failed.
+   The first live run passed with Claude Code 2.1.314 and `claude-haiku-5-5`
+   for $0.0025.
 
 ## Transcripts
 

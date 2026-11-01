@@ -2,6 +2,25 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — grader-01 phase D, the trial runner (oversee run of
+  `.claude/plans/DONE/grader-01d.trial-runner.md`):
+  - `.\20-run-trials.ps1 -Case evals\<slug> -Model <id> -Count N`
+    (`tools/scriptfix/run.py`, `python -m scriptfix run`) runs N one-shot
+    headless trials, one at a time. Each gets a fresh
+    `~\eval-trials\<NN>-run<N>\` holding only `prompt.md` and `inputs\`.
+  - The launcher gotchas from `trial-runs.md` are built in:
+    - absolute allow rules;
+    - the parent session's variables stripped, plus the repo's venv and
+      `PYTHONPATH`;
+    - the real `pwsh.exe` first on `PATH`.
+  - It never overwrites a trial, stops at the first harness problem, and
+    prints the `30-grade-trials.ps1` command that grades the batch.
+  - Each run's `<NN>-run<N>.subject.json` sidecar records its subject, and
+    the grader reads it: a sidecar wins over `-Effort/-Context/-Tools`.
+  - `-SelfTest` checks the launcher with one cheap run. Its first live run
+    passed on Claude Code 2.1.314 with `claude-haiku-5-5`, for $0.0025.
+  - The gate is at 838 passed and 6 skipped (it was 694).
+
 - **2026-11-01** — grader-01 phase C, cases 02–06 (oversee run of
   `.claude/plans/DONE/grader-01c.cases.md`):
   - `.\10-make-case.ps1 -Case evals\<slug> [-DryRun]`
