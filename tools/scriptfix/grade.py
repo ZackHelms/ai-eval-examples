@@ -382,6 +382,7 @@ def _decide(
     files: TrialFiles,
     loaded: _Loaded,
     replays: _Replays,
+    repo_root: Path | None = None,
 ) -> TrialOutcome:
     """Apply the verdict rules to one run."""
     base = _base(files, loaded)
@@ -403,7 +404,7 @@ def _decide(
             detail="; ".join(f.detail for f in validity),
         )
 
-    fair_play = check_fair_play(loaded.transcript)
+    fair_play = check_fair_play(loaded.transcript, repo_root=repo_root)
     try:
         fix_src: str | None = loaded.data.decode("utf-8")
     except UnicodeDecodeError:
@@ -529,12 +530,16 @@ def grade(
     date: str | None = None,
     replay_fn: ReplayFn | None = None,
     out: Out = print,
+    repo_root: Path | None = None,
 ) -> GradeResult:
     """Grade ``runs`` of the case at ``case_dir`` and record the verdicts.
 
     ``trials_root`` defaults to ``~/eval-trials`` and ``projects_root`` to
     ``~/.claude/projects``. ``replay_fn`` defaults to ``scriptfix.replay.replay``
-    looked up at call time. Replays are strictly sequential. Nothing is
+    looked up at call time. ``repo_root`` is the repo that holds the case
+    (two levels above the case directory, ``evals/<slug>``); its ancestors
+    are off limits to a recursive search (see ``check_fair_play``). Replays
+    are strictly sequential. Nothing is
     written to the case until every verdict (and the closing controls) is
     in, so a crash leaves the case as it was; and when a control replay is
     surprising nothing is written at all (the batch is void, so earlier
@@ -548,6 +553,7 @@ def grade(
     projects_root = (
         Path(projects_root) if projects_root is not None else Path.home() / ".claude" / "projects"
     )
+    repo_root = Path(repo_root) if repo_root is not None else case.path.resolve().parents[1]
     when = date if date is not None else datetime.date.today().isoformat()
     reference_bytes = case.reference_script.read_bytes()
     input_bytes = case.input_script.read_bytes()
@@ -573,7 +579,9 @@ def grade(
         replays.seed(fix_hash(reference_bytes), reference_result)
         replays.seed(fix_hash(input_bytes), input_result)
         for item, loaded in zip(files, loads, strict=True):
-            outcomes.append(_decide(case, reference_src, input_src, item, loaded, replays))
+            outcomes.append(
+                _decide(case, reference_src, input_src, item, loaded, replays, repo_root)
+            )
         failure, _closing_reference, _closing_input = _run_controls(replays, case, "closing", out)
         if failure:
             out(failure)

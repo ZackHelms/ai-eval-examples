@@ -27,7 +27,7 @@
 .PARAMETER Case
     The eval directory, e.g. evals\01-playwright-python-basic. Grade mode takes
     exactly one; with -Report it may be repeated (comma-separated) to limit
-    the report.
+    the report. A relative path resolves against your current folder.
 
 .PARAMETER Runs
     Runs to grade: 1-12 or 1,3,5-7. Required in grade mode.
@@ -95,16 +95,36 @@ if ($Help -or $UnknownArgs -contains '--help') {
     Get-Help $PSCommandPath -Detailed
     return
 }
-if ($UnknownArgs) {
-    throw "Unknown argument(s): $UnknownArgs. Run .\$(Split-Path -Leaf $PSCommandPath) -h for usage."
+
+# Exit code 1 means "a control was surprising", so every usage error exits 2.
+$scriptName = Split-Path -Leaf $PSCommandPath
+function Stop-Usage([string]$Message) {
+    [Console]::Error.WriteLine("$Message Run .\$scriptName -h for usage.")
+    exit 2
+}
+if ($UnknownArgs) { Stop-Usage "Unknown argument(s): $UnknownArgs." }
+# `pwsh -File` hands a comma list over as one string, so split it here.
+if ($Case) { $Case = @($Case -split ',' | Where-Object { $_ }) }
+if (-not $Report) {
+    if (-not $Case) { Stop-Usage "Missing -Case (the eval directory to grade)." }
+    if ($Case.Count -ne 1) { Stop-Usage "Grade mode takes exactly one -Case (got $($Case.Count))." }
+    if (-not $Runs) { Stop-Usage "Missing -Runs (e.g. 3-12 or 1,3,5-7)." }
 }
 
-$scriptName = Split-Path -Leaf $PSCommandPath
-if (-not $Report) {
-    if (-not $Case) { throw "Missing -Case (the eval directory to grade). Run .\$scriptName -h for usage." }
-    if ($Case.Count -ne 1) { throw "Grade mode takes exactly one -Case (got $($Case.Count)). Run .\$scriptName -h for usage." }
-    if (-not $Runs) { throw "Missing -Runs (e.g. 3-12 or 1,3,5-7). Run .\$scriptName -h for usage." }
+# Resolve against the caller's directory before anything changes directory;
+# Python runs from the repo root, so it gets absolute paths.
+$caseDirs = @()
+foreach ($c in $Case) {
+    $dir = [IO.Path]::GetFullPath($c, $PWD.Path)
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+        Stop-Usage "-Case is not a directory: $dir."
+    }
+    $caseDirs += $dir
 }
+$trialsRootDir = $null
+if ($TrialsRoot) { $trialsRootDir = [IO.Path]::GetFullPath($TrialsRoot, $PWD.Path) }
+$projectsRootDir = $null
+if ($ProjectsRoot) { $projectsRootDir = [IO.Path]::GetFullPath($ProjectsRoot, $PWD.Path) }
 
 # The work runs in a child scope so StrictMode, $ErrorActionPreference and the
 # helper variables don't leak into your session. Python's exit code lands in
@@ -119,15 +139,17 @@ $script:exitCode = 0
     $repoRoot   = $PSScriptRoot
     $venvPython = Join-Path $repoRoot ($IsWindows ? '.venv\Scripts\python.exe' : '.venv/bin/python')
     if (-not (Test-Path $venvPython)) {
-        throw "Venv python not found at $venvPython. Run .\01-setup-env.ps1 first."
+        [Console]::Error.WriteLine("Venv python not found at $venvPython. Run .\01-setup-env.ps1 first.")
+        $script:exitCode = 2
+        return
     }
 
     $pyArgs = @('-m', 'scriptfix', ($Report ? 'report' : 'grade'))
-    foreach ($c in $Case) { $pyArgs += @('--case', $c) }
+    foreach ($c in $caseDirs) { $pyArgs += @('--case', $c) }
     if (-not $Report) { $pyArgs += @('--runs', $Runs) }
     $optional = @(
-        @('--trials-root',   $TrialsRoot),
-        @('--projects-root', $ProjectsRoot),
+        @('--trials-root',   $trialsRootDir),
+        @('--projects-root', $projectsRootDir),
         @('--effort',        $Effort),
         @('--context',       $Context),
         @('--tools',         $Tools)

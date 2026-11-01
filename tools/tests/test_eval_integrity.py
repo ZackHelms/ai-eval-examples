@@ -8,9 +8,10 @@ tests call the same functions on a broken copy of a generated case in tmp_path.
 
 A *generated case* is an eval with grading/recipe.toml (built by
 10-make-case.ps1). Checks 1-4 apply to every eval. Checks 5-10 apply to
-generated cases only: they are parametrized over every eval but call
-pytest.skip for the others. Eval 01 (the hand-made calibration case) has no
-recipe, so it is not a generated case and checks 5-10 skip it. That is how
+generated cases only, and check 11 to generated escalate cases only: they
+are parametrized over every eval but call pytest.skip for the others. Eval
+01 (the hand-made calibration case) has no recipe, so it is not a generated
+case and checks 5-11 skip it. That is how
 its known repo-path leak is exempt: its inputs/results.txt names the repo
 path (.claude/standards/architecture.md, Learnings, "Evidence that points at
 the answer key"). Any other check failing on Eval 01 is a real failure.
@@ -33,6 +34,8 @@ The checks:
 10. capture.toml has exactly the expected keys and values (1 user x 1
     iteration, reference exit 0, input exit non-zero, failing line ==
     fails_at).
+11. Escalate cases: the input's steps are the reference's plus exactly one
+    (the blocked step the grader finds by position).
 
 Tests read files only: no browser, no site, no replays.
 """
@@ -49,11 +52,14 @@ import pytest
 
 from scriptfix.case import load_case
 from scriptfix.makecase import build_scripts, load_recipe
+from scriptfix.static import EXPECTED_ESCALATE, blocked_step
+from scriptfix.steps import extract_steps
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVALS_DIR = REPO_ROOT / "evals"
 SHARED_PROMPT = REPO_ROOT / "rubrics" / "script-fix" / "prompt.md"
 CASE_02 = EVALS_DIR / "02-docs-journey-a"
+CASE_06 = EVALS_DIR / "06-docs-journey-e"
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 INPUT_PATH_RE = re.compile(r"inputs/[A-Za-z0-9_./-]*[A-Za-z0-9_]")
@@ -97,6 +103,12 @@ def is_generated(eval_dir: Path) -> bool:
 def _require_generated(eval_dir: Path) -> None:
     if not is_generated(eval_dir):
         pytest.skip(f"{eval_dir.name} has no grading/recipe.toml, so it is not a generated case (module docstring)")
+
+
+def _require_escalate(eval_dir: Path) -> None:
+    _require_generated(eval_dir)
+    if load_case(eval_dir).expected != EXPECTED_ESCALATE:
+        pytest.skip(f"{eval_dir.name} is not an escalate case (module docstring)")
 
 
 def _decode(data: bytes) -> str:
@@ -149,7 +161,7 @@ def _capture(eval_dir: Path, check: str) -> dict:
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
-# --- the ten checks --------------------------------------------------------
+# --- the eleven checks -----------------------------------------------------
 
 
 def check_1_required_layout(eval_dir: Path) -> None:
@@ -293,6 +305,17 @@ def check_10_capture_toml(eval_dir: Path) -> None:
         )
 
 
+def check_11_one_blocked_step(eval_dir: Path) -> None:
+    name = eval_dir.name
+    reference = extract_steps(_read_text(eval_dir, "grading/reference/script.py", "check 11"))
+    broken = extract_steps(_read_text(eval_dir, "inputs/script.py", "check 11"))
+    if blocked_step(reference, broken) is None:
+        raise AssertionError(
+            f"check 11: {name}: inputs/script.py's steps are not grading/reference/script.py's "
+            f"plus exactly one (the input has {len(broken)} steps, the reference {len(reference)})"
+        )
+
+
 # --- the gate: every eval --------------------------------------------------
 
 
@@ -350,6 +373,12 @@ def test_9_results_evidence(eval_dir):
 def test_10_capture_toml(eval_dir):
     _require_generated(eval_dir)
     check_10_capture_toml(eval_dir)
+
+
+@pytest.mark.parametrize("eval_dir", _eval_dirs())
+def test_11_one_blocked_step(eval_dir):
+    _require_escalate(eval_dir)
+    check_11_one_blocked_step(eval_dir)
 
 
 # --- failure tests: each check fails on a broken copy of case 02 -----------
@@ -474,3 +503,13 @@ def test_10_fails_with_two_users(broken):
     _replace_in_toml(broken / "grading" / "capture.toml", "users              = 1", "users              = 2")
     with pytest.raises(AssertionError, match="users must be 1"):
         check_10_capture_toml(broken)
+
+
+def test_11_fails_when_the_input_is_the_reference(tmp_path):
+    # Case 02 is a fix case, so check 11 runs on a copy of the escalate case 06.
+    copy = tmp_path / CASE_06.name
+    shutil.copytree(CASE_06, copy)
+    check_11_one_blocked_step(copy)
+    shutil.copyfile(copy / "grading" / "reference" / "script.py", copy / "inputs" / "script.py")
+    with pytest.raises(AssertionError, match="check 11: .*plus exactly one"):
+        check_11_one_blocked_step(copy)

@@ -26,7 +26,8 @@ What it runs, for reference: it copies `prompt.md` + `inputs/` to
 only the number), then from that folder:
 
 ```pwsh
-claude -p "<prompt.md text>" --safe-mode --strict-mcp-config --model <model> `
+claude -p "<prompt.md text>" --safe-mode --strict-mcp-config `
+  --tools Read,Glob,Grep,Edit,Write,Bash,PowerShell --model <model> `
   --permission-mode default `
   --allowedTools "Edit(//c/Users/<you>/eval-trials/<NN>-run<N>/inputs/script.py)" `
                  "Write(//c/Users/<you>/eval-trials/<NN>-run<N>/inputs/script.py)" `
@@ -36,9 +37,14 @@ claude -p "<prompt.md text>" --safe-mode --strict-mcp-config --model <model> `
 Add `--effort <level>` for a non-default effort. In headless mode anything
 that needs approval is denied automatically and listed in the result
 line's `permission_denials`. Read-only commands inside the trial folder run
-without approval. So with these rules the model can read and edit, but
-can't run the script or fetch the web: that's the subject's tool profile
-(`edit-only`). Record it with the result.
+without approval. The tool profile is that `--tools` allowlist (CD
+decision, 2026-11-01: no web). Edits are allowed only on `inputs/script.py`,
+so the model can read and edit, but can't run the script. The sidecar's
+`tools` label stays `edit-only`, and its `tool_list` records the seven
+names. The self-test checks the stream log's `init` line lists exactly
+those seven.
+- Eval 01's runs had the full built-in tool list but used none of the extra
+  tools.
 
 ## Making a case
 

@@ -7,7 +7,7 @@ copied from a real trial.
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -433,6 +433,116 @@ def test_ls_of_the_venv_gives_no_finding(tmp_path):
 def test_powershell_lowercase_r_on_ls_is_recursive(tmp_path):
     t = shell(tmp_path, rf"ls -r {REPO}", tool="PowerShell")
     assert tags(check_fair_play(t)) == [TAG_ANSWER_KEY]
+
+
+# -- fair play: above the repo -------------------------------------------------
+
+# Never derived from __file__: an oversee worktree lives under the repo.
+ROOT = PureWindowsPath(r"D:\gitrepos\ai-eval-examples")
+
+
+def above(call: Transcript, repo_root=ROOT):
+    return check_fair_play(call, repo_root=repo_root)
+
+
+@pytest.mark.parametrize(
+    ("command", "tool"),
+    [
+        ("grep -r rubric D:/gitrepos", "Bash"),
+        (r"Get-ChildItem -Recurse D:\ ", "PowerShell"),
+        ("rg rubric /d/gitrepos", "Bash"),
+        ('rg rubric "D:\\GitRepos\\\\"', "Bash"),
+        ("find d: -name rubric.md", "Bash"),
+        ("rg rubric /d", "Bash"),
+        ("grep -r x D:/gitrepos/*", "Bash"),
+        ("ls -R D:/gitrepos/** 2>&1", "Bash"),
+        ("cd /tmp && rg rubric 'D:/gitrepos'", "Bash"),
+    ],
+)
+def test_recursive_search_of_an_ancestor_is_answer_key(tmp_path, command, tool):
+    findings = above(shell(tmp_path, command, tool=tool))
+    assert tags(findings) == [TAG_ANSWER_KEY]
+    assert findings[0].severity == SEVERITY_ZERO
+    assert findings[0].detail.startswith("searched above the repo: ")
+
+
+def test_the_detail_names_the_searched_path(tmp_path):
+    (finding,) = above(shell(tmp_path, "grep -r rubric D:/gitrepos"))
+    assert finding.detail == "searched above the repo: D:/gitrepos"
+
+
+def test_grep_with_path_at_an_ancestor_is_answer_key(tmp_path):
+    t = trial_with(tmp_path, "Grep", pattern="x", path=r"D:\gitrepos")
+    assert tags(above(t)) == [TAG_ANSWER_KEY]
+
+
+def test_glob_with_path_at_an_ancestor_is_answer_key(tmp_path):
+    t = trial_with(tmp_path, "Glob", pattern="*.md", path="D:/")
+    assert tags(above(t)) == [TAG_ANSWER_KEY]
+
+
+def test_glob_pattern_rooted_at_an_ancestor_is_answer_key(tmp_path):
+    t = trial_with(tmp_path, "Glob", pattern="D:/gitrepos/**/rubric.md")
+    assert tags(above(t)) == [TAG_ANSWER_KEY]
+
+
+def test_an_ancestor_in_a_denied_call_counts(tmp_path):
+    t = stream_trial(
+        tmp_path,
+        [tool_use("c1", "Read", file_path="a")],
+        permission_denials=[denial("Grep", pattern="x", path="D:/gitrepos")],
+    )
+    assert tags(above(t)) == [TAG_ANSWER_KEY]
+
+
+@pytest.mark.parametrize(
+    ("command", "tool"),
+    [
+        ("ls D:/gitrepos", "Bash"),  # not recursive
+        ("grep rubric D:/gitrepos", "Bash"),
+        ("grep -r foo C:/Users/a/eval-trials/01-run3", "Bash"),  # not an ancestor
+        ("grep -r foo D:/gitrepos/other-project", "Bash"),  # below an ancestor
+        ("grep -r foo D:/gitrepos-two", "Bash"),
+        ("find . -name x", "Bash"),
+        ("rg foo ./inputs", "Bash"),
+        ('ls "D:/gitrepos/ai-eval-examples/.venv" 2>&1', "Bash"),  # recorded in Eval 01, run 10
+        ("Get-ChildItem D:\\", "PowerShell"),
+    ],
+)
+def test_other_shell_forms_are_not_above_the_repo(tmp_path, command, tool):
+    assert above(shell(tmp_path, command, tool=tool)) == []
+
+
+def test_grep_and_glob_elsewhere_are_not_above_the_repo(tmp_path):
+    assert above(trial_with(tmp_path, "Grep", pattern="x", path="D:/gitrepos/other")) == []
+    assert above(trial_with(tmp_path, "Grep", pattern="x", path="C:/gitrepos")) == []
+    assert above(trial_with(tmp_path, "Glob", pattern="inputs/**/*.py")) == []
+    assert above(trial_with(tmp_path, "Glob", pattern="**/rubric.md")) == []
+    assert above(trial_with(tmp_path, "Glob", pattern="D:/gitrepos/other/**/*.md")) == []
+
+
+def test_without_a_repo_root_the_rule_is_off(tmp_path):
+    assert check_fair_play(shell(tmp_path, "grep -r rubric D:/gitrepos")) == []
+    assert above(shell(tmp_path, "grep -r rubric D:/gitrepos"), repo_root=None) == []
+
+
+def test_a_repo_root_with_no_ancestors_turns_the_rule_off(tmp_path):
+    assert above(shell(tmp_path, "grep -r rubric D:/"), repo_root=PureWindowsPath("D:/")) == []
+
+
+def test_a_concrete_repo_root_is_resolved_before_its_ancestors_are_taken(tmp_path):
+    parent = tmp_path.resolve() / "a"
+    t = trial_with(tmp_path, "Grep", pattern="x", path=str(parent))
+    assert tags(above(t, repo_root=parent / "repo")) == [TAG_ANSWER_KEY]
+    # The repo itself is not one of its own ancestors.
+    own = trial_with(tmp_path, "Grep", pattern="x", path=str(parent / "repo"))
+    assert above(own, repo_root=parent / "repo") == []
+
+
+def test_the_grading_rule_still_fires_with_a_repo_root(tmp_path):
+    findings = above(trial_with(tmp_path, "Read", file_path=GRADING_FILE))
+    assert tags(findings) == [TAG_ANSWER_KEY]
+    assert "grading" in findings[0].detail
 
 
 def test_one_answer_key_finding_per_trial(tmp_path):

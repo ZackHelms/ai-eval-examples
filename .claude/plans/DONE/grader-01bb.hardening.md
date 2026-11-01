@@ -1,6 +1,7 @@
 # grader-01bb — grader hardening, a red-team agent and the trial tool allowlist
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-01 (oversee run, `0bd4623..588e6e8` plus
+the wrap-up docs; follow-up: `grader-01bb.hardening.follow-up.md`)
 **Requested:** 2026-10-31; re-drafted 2026-11-01 at `f292df6` by
 `/zmh-producer:backlog-plan-gen`. It gathers:
 - grader-01b's residue

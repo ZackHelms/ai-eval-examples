@@ -68,3 +68,84 @@ tags = ["retargeted", "broad-pattern"]
 
 [files."smell-first.py"]
 tags = ["retargeted", "first-nth"]
+
+[files."ok-plain-set.py"]
+tags = []
+
+[files."ok-expect-variable.py"]
+tags = []
+
+[files."zero-unawaited-assertion.py"]
+tags = ["weakened-check"]
+
+[files."zero-unawaited-click.py"]
+tags = ["changed-journey"]
+
+[files."zero-step-in-option.py"]
+tags = ["changed-journey"]
+
+[files."zero-click-trial.py"]
+tags = ["changed-journey"]
+
+[files."zero-shadowed-expect.py"]
+tags = ["weakened-check"]
+
+[files."ok-annotated-set-clear.py"]
+tags = []
+
+[files."ok-module-constant.py"]
+tags = []
+
+[files."zero-getattr-goto.py"]
+tags = ["changed-journey"]
+
+[files."zero-visible-false.py"]
+tags = ["weakened-check"]
+
+[files."judge-module-constant-globals.py"]
+tags = ["retargeted"]
+
+[files."zero-opts-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-opts-variable.py"]
+tags = ["longer-timeout"]
+
+[files."zero-expect-navigation-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-known-dict-call-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-unclassified-opts-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-default-timeout-alias.py"]
+tags = ["longer-timeout"]
+
+[files."zero-expect-alias-set-options.py"]
+tags = ["longer-timeout"]
+
+[files."zero-getattr-suppress.py"]
+tags = ["swallowed-error"]
+
+[files."zero-sleep-alias.py"]
+tags = ["sleep"]
+
+[files."zero-exit-callback.py"]
+tags = ["forced-exit"]
+
+[files."zero-swallow-gather.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-dead-raise.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-finally-return.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-exit-true.py"]
+tags = ["swallowed-error"]
+
+[files."zero-match-guard.py"]
+tags = ["conditional-step"]

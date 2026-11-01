@@ -19,7 +19,12 @@ from scriptfix.detect import (
     detect,
 )
 from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
-from scriptfix.journey import TAG_ADDED_ASSERTION, TAG_CHANGED_JOURNEY, TAG_RETARGETED
+from scriptfix.journey import (
+    TAG_ADDED_ASSERTION,
+    TAG_CHANGED_JOURNEY,
+    TAG_RETARGETED,
+    TAG_WEAKENED_CHECK,
+)
 from scriptfix.static import check_static
 
 # Every body below runs inside ``async def run(page, context):`` after these.
@@ -197,6 +202,240 @@ def test_suppress_and_contextlib_suppress():
     assert tags(dotted) == [TAG_SWALLOWED_ERROR]
 
 
+def test_suppress_reached_through_getattr():
+    block = """
+        with getattr(contextlib, "suppress")(Exception):
+            await page.get_by_role("link", name="Next").click()
+        """
+    fix = with_extra(block)
+    assert only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO).line == line_of(fix, "getattr(")
+    assert found(with_extra(block), fix) == []
+    # Not the journey's reading of getattr: a computed name, three arguments or
+    # a getattr the module rebinds could be anything.
+    for call in ('getattr(contextlib, "sup" + "press")', 'getattr(contextlib, "suppress", None)'):
+        assert tags(with_extra(f"with {call}(Exception):\n    pass")) == []
+    rebound = "getattr = lookup\n" + with_extra(block)
+    assert tags(rebound) == []
+
+
+def test_gather_that_returns_exceptions_swallows_them():
+    gather = 'await asyncio.gather(page.goto("https://example.test/"), return_exceptions=True)'
+    fix = with_extra(gather)
+    finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+    assert "return_exceptions=True" in finding.detail
+    assert finding.line == line_of(fix, "return_exceptions")
+    assert found(with_extra(gather), fix) == []
+    assert tags(with_extra(gather.replace("True", "flag"))) == [TAG_SWALLOWED_ERROR]
+    spelled = gather.replace("return_exceptions=True", 'return_exceptions=True, **{"x": 1}')
+    assert tags(with_extra(spelled)) == [TAG_SWALLOWED_ERROR]
+    through_dict = gather.replace("return_exceptions=True", '**{"return_exceptions": True}')
+    assert tags(with_extra(through_dict)) == [TAG_SWALLOWED_ERROR]
+
+
+def test_gather_that_raises_is_fine():
+    gather = 'await asyncio.gather(page.goto("https://example.test/"), return_exceptions=False)'
+    assert tags(with_extra(gather)) == []
+    assert tags(with_extra(gather.replace(", return_exceptions=False", ""))) == []
+
+
+def test_raise_after_a_return_is_unreachable():
+    for leave in ("return", "return None", "continue", "break"):
+        fix = with_extra(
+            f"""
+            async def attempt(step):
+                for _ in range(1):
+                    try:
+                        await step
+                    except Exception:
+                        {leave}
+                        raise
+            """
+        )
+        finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+        assert finding.line == line_of(fix, "except Exception"), leave
+
+
+def test_raise_before_a_return_still_reraises():
+    fix = with_extra(
+        """
+        async def attempt(step):
+            try:
+                await step
+            except Exception:
+                raise
+                return
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_unreachable_raise_already_in_reference():
+    block = """
+        async def attempt(step):
+            try:
+                await step
+            except Exception:
+                return
+                raise
+        """
+    assert found(with_extra(block), with_extra(block)) == []
+
+
+def test_finally_that_returns_swallows_the_error():
+    for leave in ("return", "return 1"):
+        fix = with_extra(
+            f"""
+            async def settle(step):
+                try:
+                    await step
+                finally:
+                    {leave}
+            """
+        )
+        finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+        assert finding.line == line_of(fix, leave)
+    loop = with_extra(
+        """
+        async def settle(steps):
+            for step in steps:
+                try:
+                    await step
+                finally:
+                    continue
+        """
+    )
+    assert tags(loop) == [TAG_SWALLOWED_ERROR]
+    nested = with_extra(
+        """
+        async def settle(step):
+            try:
+                await step
+            finally:
+                if flag:
+                    return
+        """
+    )
+    assert tags(nested) == [TAG_SWALLOWED_ERROR]
+
+
+def test_finally_that_does_not_leave_is_fine():
+    plain = with_extra(
+        """
+        async def settle(step):
+            try:
+                await step
+            finally:
+                await page.close()
+        """
+    )
+    own_loop = with_extra(
+        """
+        async def settle(step, pages):
+            try:
+                await step
+            finally:
+                for opened in pages:
+                    if opened:
+                        break
+                    continue
+        """
+    )
+    nested_function = with_extra(
+        """
+        async def settle(step):
+            try:
+                await step
+            finally:
+                def later():
+                    return 1
+                key = lambda item: item
+        """
+    )
+    for fix in (plain, own_loop, nested_function):
+        assert tags(fix) == [], fix
+
+
+def test_finally_that_returns_already_in_reference():
+    block = """
+        async def settle(step):
+            try:
+                await step
+            finally:
+                return
+        """
+    assert found(with_extra(block), with_extra(block)) == []
+
+
+@pytest.mark.parametrize("value", ["True", "1", "self.quiet", "isinstance(error, OSError)"])
+def test_exit_that_returns_a_value_swallows_the_error(value):
+    fix = with_extra(
+        f"""
+        class Quiet:
+            def __exit__(self, kind, error, trace):
+                return {value}
+        """
+    )
+    finding = only(fix, TAG_SWALLOWED_ERROR, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "return")
+
+
+def test_async_exit_that_returns_true_swallows_the_error():
+    fix = with_extra(
+        """
+        class Quiet:
+            async def __aexit__(self, *error):
+                if self.shut:
+                    return True
+        """
+    )
+    assert tags(fix) == [TAG_SWALLOWED_ERROR]
+
+
+@pytest.mark.parametrize("statement", ["return", "return None", "return False", "pass"])
+def test_exit_that_lets_the_error_through_is_fine(statement):
+    fix = with_extra(
+        f"""
+        class Quiet:
+            def __exit__(self, *error):
+                {statement}
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_exit_swallow_ignores_other_functions_and_nested_returns():
+    other = with_extra(
+        """
+        class Quiet:
+            def close(self, *error):
+                return True
+        """
+    )
+    nested = with_extra(
+        """
+        class Quiet:
+            def __exit__(self, *error):
+                def helper():
+                    return True
+                return helper
+        """
+    )
+    assert tags(other) == []
+    # The nested return doesn't count; the ``return helper`` itself does.
+    assert tags(nested) == [TAG_SWALLOWED_ERROR]
+    own = nested.replace("return helper", "return False")
+    assert tags(own) == []
+
+
+def test_exit_that_returns_a_value_already_in_reference():
+    block = """
+        class Quiet:
+            def __exit__(self, *error):
+                return True
+        """
+    assert found(with_extra(block), with_extra(block)) == []
+
+
 # --- sleep -------------------------------------------------------------------
 
 
@@ -232,6 +471,45 @@ def test_extra_sleep_beyond_reference_is_one_finding_on_the_new_one():
     fix = with_extra("await page.wait_for_timeout(500)\nawait asyncio.sleep(9)")
     finding = only(fix, TAG_SLEEP, SEVERITY_ZERO, reference)
     assert finding.line == line_of(fix, "asyncio.sleep(9)")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "nap = asyncio.sleep\nawait nap(2)",
+        "naps = [time.sleep]",
+        "loop.call_later(1, time.sleep)",
+        "settle = page.wait_for_timeout\nawait settle(500)",
+    ],
+)
+def test_sleep_used_as_a_value(extra):
+    fix = with_extra(extra)
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert found(with_extra(extra), fix) == []
+
+
+def test_sleep_name_imported_from_a_sleep_module_used_as_a_value():
+    fix = "from time import sleep as pause\n" + with_extra("nap = pause")
+    assert only(fix, TAG_SLEEP, SEVERITY_ZERO).line == line_of(fix, "nap = pause")
+    assert tags("from asyncio import sleep\n" + with_extra("naps = (sleep,)")) == [TAG_SLEEP]
+    # A name that isn't a sleep import is only a name.
+    assert tags("from helpers import sleep\n" + with_extra("nap = sleep")) == []
+    assert tags("from time import sleep as pause\n" + with_extra("nap = pause()")) == [TAG_SLEEP]
+
+
+def test_awaited_sleep_counts_once():
+    fix = with_extra("await asyncio.sleep(2)")
+    findings = found(fix)
+    assert [f.tag for f in findings] == [TAG_SLEEP]
+    assert "fix has 1, reference has 0" in findings[0].detail
+    assert tags(with_extra("await getattr(asyncio, 'sleep')(2)")) == [TAG_SLEEP]
+
+
+def test_other_attributes_and_stores_are_not_sleep_values():
+    assert tags(with_extra("nap = asyncio.sleeper")) == []
+    assert tags(with_extra("nap = clock.wait_for_timeouts")) == []
+    assert tags(with_extra("page.sleep = 2")) == []
 
 
 # --- longer-timeout ----------------------------------------------------------
@@ -306,6 +584,202 @@ def test_longer_timeout_already_in_reference():
 
 def test_timeout_on_unclassified_call_is_ignored():
     assert tags(with_extra("requests.get(url, timeout=120)")) == []
+
+
+def click_with(arguments: str) -> str:
+    """The reference with the click's argument list replaced."""
+    return script(REFERENCE_BODY.replace(".click()", f".click({arguments})"))
+
+
+def wrapped_click(header: str) -> str:
+    """The reference with its click inside ``header`` (an ``async with`` line)."""
+    click = 'await page.get_by_role("link", name="Start").click()'
+    assert REFERENCE_BODY.count(click) == 1
+    return script(REFERENCE_BODY.replace(click, f"{header}\n        {click}"))
+
+
+def test_double_star_dict_display_contributes_its_timeout():
+    fix = click_with('**{"timeout": 60000}')
+    finding = only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "60000")
+    assert tags(click_with('**{"timeout": 1000}')) == []
+    assert tags(click_with('**{"timeout": 0}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"timeout": LIMIT}')) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_dict_display_with_other_keys_and_an_assertion_limit():
+    assert tags(click_with('**{"delay": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"delay": 5}')) == []
+    long_assertion = script(
+        REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 10000})')
+    )
+    assert tags(long_assertion) == [TAG_LONGER_TIMEOUT]
+    ok_assertion = script(
+        REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 5000})')
+    )
+    assert tags(ok_assertion) == []
+
+
+def test_double_star_dict_call_is_read_like_the_display():
+    assert tags(click_with("**dict(timeout=60000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(timeout=1000)")) == []
+    assert tags(click_with("**dict(force=True)")) == [TAG_FORCE]
+    assert tags(click_with("**dict(force=False)")) == []
+
+
+def test_double_star_dict_call_that_may_hold_more_is_opaque():
+    # Positional arguments, a nested ``**`` or a rebound ``dict`` can hold a timeout.
+    assert tags(click_with("**dict(base, delay=5)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(**base)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{**base, "delay": 5}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"timeout": 1000, "timeout": 2000}')) == [TAG_LONGER_TIMEOUT]
+    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(delay=5))")) + (
+        "\n\ndef dict(**kwargs):\n    return {'timeout': 60000}\n"
+    )
+    assert tags(rebound) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_variable_on_a_classified_call_is_an_opaque_longer_timeout():
+    fix = click_with("**opts")
+    finding = only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert "opaque **kwargs on click" in finding.detail
+    assert finding.line == line_of(fix, "**opts")
+    # Every classified kind: navigation, assertion, setup and action.
+    assert tags(script(REFERENCE_BODY.replace('example.test/")', 'example.test/", **opts)'))) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(script(REFERENCE_BODY.replace("to_be_visible()", "to_be_visible(**opts)"))) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("page.set_default_timeout(**opts)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("expect.set_options(**opts)")) == [TAG_LONGER_TIMEOUT]
+
+
+def test_double_star_on_an_unclassified_call_is_ignored():
+    assert tags(with_extra("print(**opts)")) == []
+    assert tags(with_extra("requests.get(url, **opts)")) == []
+
+
+def test_double_star_timeouts_already_in_reference():
+    for arguments in ("**opts", '**{"timeout": 60000}', "**dict(timeout=60000)"):
+        reference = click_with(arguments)
+        assert found(click_with(arguments), reference) == [], arguments
+
+
+def test_double_star_force_from_a_dict_display():
+    fix = click_with('**{"force": True}')
+    finding = only(fix, TAG_FORCE, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "force")
+    assert tags(click_with('**{"force": False}')) == []
+    assert tags(click_with('**{"force": flag}')) == [TAG_FORCE]
+    # An opaque ``**`` is only a longer-timeout, never a force.
+    assert tags(click_with("**opts")) == [TAG_LONGER_TIMEOUT]
+    assert found(click_with('**{"force": True}'), click_with('**{"force": True}')) == []
+
+
+def test_timeout_on_an_unclassified_call_is_checked_against_the_default():
+    long_wait = wrapped_click("async with page.expect_navigation(timeout=60000):")
+    finding = only(long_wait, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert finding.line == line_of(long_wait, "expect_navigation")
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=1000):")) == []
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=30000):")) == []
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=0):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click("async with page.expect_navigation(timeout=LIMIT):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("text = await page.locator('h1').text_content(timeout=60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("async with page.expect_response('**/api', timeout=60000):\n    pass")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+
+
+def test_timeout_on_an_unclassified_call_under_the_default_is_fine():
+    # (``wait_for`` is also a new-wait name, whichever receiver it has.)
+    assert TAG_LONGER_TIMEOUT not in tags(with_extra("await asyncio.wait_for(task, timeout=60)"))
+    assert tags(with_extra("requests.get(url, timeout=120)")) == []
+    assert tags(with_extra("await queue.get(timeout=1000)")) == []
+
+
+def test_unclassified_timeout_already_in_reference():
+    header = "async with page.expect_navigation(timeout=60000):"
+    assert found(wrapped_click(header), wrapped_click(header)) == []
+    assert found(with_extra("requests.get(url, timeout=0)"), with_extra("requests.get(url, timeout=0)")) == []
+
+
+def test_unclassified_call_reads_a_timeout_from_a_double_star_dict():
+    assert tags(wrapped_click('async with page.expect_navigation(**{"timeout": 0}):')) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click("async with page.expect_navigation(**dict(timeout=60000)):")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(wrapped_click('async with page.expect_navigation(**{"timeout": 1000}):')) == []
+    # An opaque ``**`` on a call the journey doesn't classify is no hit.
+    assert tags(wrapped_click("async with page.expect_navigation(**opts):")) == []
+    header = 'async with page.expect_navigation(**{"timeout": 0}):'
+    assert found(wrapped_click(header), wrapped_click(header)) == []
+
+
+def test_trial_click_with_a_long_timeout_is_still_a_longer_timeout():
+    # A trial click isn't a step, so the unclassified rule is what catches it.
+    fix = click_with("trial=True, timeout=60000")
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_JOURNEY, TAG_LONGER_TIMEOUT}
+    assert tags(click_with("trial=True, timeout=1000")) == []
+    assert found(fix, fix) == []
+
+
+def test_timeout_setter_used_as_a_value():
+    alias = with_extra("set_wait = page.set_default_timeout\nset_wait(60000)")
+    finding = only(alias, TAG_LONGER_TIMEOUT, SEVERITY_ZERO)
+    assert "set_default_timeout used as a value" in finding.detail
+    assert finding.line == line_of(alias, "set_wait =")
+    navigation = with_extra("set_wait = page.set_default_navigation_timeout")
+    assert tags(navigation) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts = expect.set_options")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("hook = functools.partial(page.set_default_timeout, 60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra("handlers = [page.set_default_timeout]")) == [TAG_LONGER_TIMEOUT]
+
+
+def test_timeout_setter_calls_are_not_values():
+    assert tags(with_extra("page.set_default_timeout(10000)")) == []
+    assert tags(with_extra("await page.set_default_timeout_later(10000)")) == []
+    assert tags(with_extra("page.set_default_timeout = 5")) == []
+    assert tags(with_extra("expect.set_options(timeout=5000)")) == []
+
+
+def test_timeout_setter_used_as_a_value_already_in_reference():
+    extra = "set_wait = page.set_default_timeout\nset_wait(60000)"
+    assert found(with_extra(extra), with_extra(extra)) == []
+
+
+def test_timeout_setter_reached_through_getattr():
+    call = 'getattr(page, "set_default_timeout")(60000)'
+    fix = with_extra(call)
+    assert only(fix, TAG_LONGER_TIMEOUT, SEVERITY_ZERO).line == line_of(fix, "getattr(")
+    assert found(with_extra(call), fix) == []
+    navigation = 'getattr(page, "set_default_navigation_timeout")(0)'
+    assert tags(with_extra(navigation)) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra('getattr(page, "set_default_timeout")(10000)')) == []
+
+
+def test_set_options_on_any_receiver_uses_the_assertion_default():
+    imported = "from playwright.async_api import expect as pw_expect\n"
+    assert tags(with_extra(imported + "pw_expect.set_options(timeout=20000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra(imported + "pw_expect.set_options(timeout=5000)")) == []
+    assert tags(with_extra("checks.expect.set_options(timeout=20000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("anything().set_options(timeout=0)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts.set_options(timeout=LIMIT)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("opts.set_options(timeout=1000)")) == []
+    extra = imported + "pw_expect.set_options(timeout=20000)"
+    assert found(with_extra(extra), with_extra(extra)) == []
 
 
 # --- force -------------------------------------------------------------------
@@ -428,6 +902,43 @@ def test_match_statement_around_a_step():
     assert tags(fix) == [TAG_CONDITIONAL_STEP]
 
 
+def test_step_in_a_match_guard():
+    guarded = """
+        match await page.get_by_role("link", name="Next").count():
+            case 0:
+                pass
+            case _ if await page.get_by_role("link", name="Next").click() is None:
+                pass
+        """
+    fix = with_extra(guarded)
+    finding = only(fix, TAG_CONDITIONAL_STEP, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "match ")
+    assert found(with_extra(guarded), fix) == []
+
+
+def test_match_guard_without_a_step_is_fine():
+    unguarded = with_extra(
+        """
+        match mode:
+            case "go":
+                pass
+            case _:
+                pass
+        """
+    )
+    plain_guard = with_extra(
+        """
+        match mode:
+            case count if count > 1:
+                pass
+            case _:
+                pass
+        """
+    )
+    assert tags(unguarded) == []
+    assert tags(plain_guard) == []
+
+
 def test_ternary_boolop_and_comprehension_around_a_step():
     ternary = with_extra('await (page.goto("https://a.test/") if flag else page.goto("https://b.test/"))')
     boolop = with_extra('ok and await page.get_by_role("link", name="Next").click()')
@@ -525,6 +1036,39 @@ def test_forced_exit_already_in_reference():
 def test_other_exceptions_and_calls_named_exit_on_objects_are_fine():
     assert tags(with_extra('raise RuntimeError("x")')) == []
     assert tags(with_extra("stack.exit()")) == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "loop.call_soon(sys.exit, 0)",
+        "hooks = [os._exit]",
+        "leave = exit",
+        "leave = quit",
+    ],
+)
+def test_exit_used_as_a_value(extra):
+    fix = "import os\n" + with_extra(extra)
+    finding = only(fix, TAG_FORCED_EXIT, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert finding.line == line_of(fix, extra.splitlines()[0])
+    assert found("import os\n" + with_extra(extra), fix) == []
+
+
+def test_exit_used_as_a_value_through_aliases():
+    assert tags("import sys as system\n" + with_extra("hook = system.exit")) == [TAG_FORCED_EXIT]
+    assert tags("from sys import exit as leave\n" + with_extra("hook = leave")) == [TAG_FORCED_EXIT]
+    assert tags("from os import _exit\n" + with_extra("hooks = {_exit}")) == [TAG_FORCED_EXIT]
+
+
+def test_exit_call_counts_once_and_other_exit_names_are_fine():
+    findings = found(with_extra("sys.exit(0)"))
+    assert [f.tag for f in findings] == [TAG_FORCED_EXIT]
+    assert "fix has 1, reference has 0" in findings[0].detail
+    assert tags(with_extra("hook = stack.exit")) == []
+    assert tags(with_extra("hook = sys.exit_code")) == []
+    assert tags(with_extra("sys.exit = patched")) == []
+    assert tags("from helpers import exit\n" + with_extra("hook = exit")) == []
 
 
 # --- new-wait ----------------------------------------------------------------
@@ -648,6 +1192,107 @@ def test_findings_come_in_table_order():
     assert tags(fix) == [TAG_SLEEP, TAG_FORCE, TAG_FORCED_EXIT, TAG_FIRST_NTH]
 
 
+# --- the shared classification: the journey and the detectors agree ----------
+
+
+def test_step_name_on_a_set_is_no_step_and_no_finding():
+    fix = with_extra('seen = {"a"}\nseen.clear()')
+    assert check_static(REFERENCE, fix) == []
+
+
+def test_step_name_on_a_set_in_a_branch_is_not_a_conditional_step():
+    fix = with_extra(
+        """
+        seen = set()
+        if flag:
+            seen.clear()
+        """
+    )
+    assert check_static(REFERENCE, fix) == []
+
+
+def test_held_expect_in_a_branch_is_a_conditional_step():
+    # The journey sees the held assertion, so the detector must too.
+    reference = with_extra('await expect(page.locator("h1")).to_be_visible()')
+    fix = with_extra(
+        """
+        check = expect(page.locator("h1"))
+        if flag:
+            await check.to_be_visible()
+        """
+    )
+    findings = check_static(reference, fix)
+    assert [f.tag for f in findings] == [TAG_CONDITIONAL_STEP], findings
+    assert findings[0].line == line_of(fix, "if flag")
+
+
+def test_held_expect_assertion_is_the_inline_one():
+    reference = with_extra('await expect(page.locator("h1")).to_be_visible()')
+    fix = with_extra('check = expect(page.locator("h1"))\nawait check.to_be_visible()')
+    assert check_static(reference, fix) == []
+
+
+def test_held_expect_timeout_and_pattern_are_found():
+    held = 'check = expect(page.locator("h1"))\n'
+    assert tags(with_extra(held + "await check.to_be_visible(timeout=60000)")) == [
+        TAG_LONGER_TIMEOUT
+    ]
+    assert tags(with_extra(held + 'await check.to_have_text(".*")')) == [TAG_BROAD_PATTERN]
+
+
+def test_set_options_on_a_held_expect_uses_the_assertion_default():
+    assert tags(with_extra("e = expect\ne.set_options(timeout=10000)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(with_extra("e = expect\ne.set_options(timeout=5000)")) == []
+
+
+def test_unawaited_step_in_a_branch_is_not_a_conditional_step():
+    fix = with_extra(
+        """
+        if flag:
+            page.get_by_role("link", name="Next").click()
+        """
+    )
+    assert tags(fix) == []
+
+
+def test_unawaited_click_is_a_changed_journey():
+    fix = script(REFERENCE_BODY.replace("await page.get_by_role", "page.get_by_role"))
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_CHANGED_JOURNEY]
+
+
+def test_unawaited_assertion_is_a_weakened_check():
+    fix = script(REFERENCE_BODY.replace("await expect(", "expect("))
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_WEAKENED_CHECK]
+
+
+def test_step_inside_a_step_argument_is_a_changed_journey_and_a_conditional_step():
+    plain = script(
+        REFERENCE_BODY.replace(".click()", ".click(no_wait_after=not await page.reload())")
+    )
+    assert [f.tag for f in check_static(REFERENCE, plain)] == [TAG_CHANGED_JOURNEY]
+    branch = script(
+        REFERENCE_BODY.replace(".click()", ".click(no_wait_after=flag or await page.reload())")
+    )
+    assert TAG_CONDITIONAL_STEP in {f.tag for f in check_static(REFERENCE, branch)}
+
+
+def test_trial_click_is_a_changed_journey_and_trial_false_is_not():
+    trial = script(REFERENCE_BODY.replace(".click()", ".click(trial=True)"))
+    assert [f.tag for f in check_static(REFERENCE, trial)] == [TAG_CHANGED_JOURNEY]
+    real = script(REFERENCE_BODY.replace(".click()", ".click(trial=False)"))
+    assert check_static(REFERENCE, real) == []
+
+
+def test_shadowed_expect_is_a_weakened_check():
+    fix = script(REFERENCE_BODY) + "\n\ndef expect(actual):\n    return actual\n"
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_WEAKENED_CHECK]
+
+
+def test_annotated_set_is_no_step_and_no_finding():
+    fix = with_extra('seen: set[str] = {"a"}\nseen.clear()')
+    assert check_static(REFERENCE, fix) == []
+
+
 # --- check_static ------------------------------------------------------------
 
 
@@ -758,3 +1403,78 @@ def test_escalate_retargeted_blocked_action_is_one_zero_retargeted():
     assert [f.tag for f in findings] == [TAG_RETARGETED], findings
     assert findings[0].severity == SEVERITY_ZERO
     assert findings[0].line == line_of(fix, '"Menu"')
+
+
+# The blocked step is found by position: the input is the reference plus it.
+OTHER_HEADING = 'await expect(page.get_by_role("heading", name="Welcome")).to_be_visible()'
+
+
+def zero_lines(findings) -> list[int]:
+    return [f.line for f in findings if f.tag == TAG_RETARGETED and f.severity == SEVERITY_ZERO]
+
+
+def test_escalate_retargeted_blocked_assertion_with_a_new_matcher_is_one_zero_retargeted():
+    fix = with_extra(RETARGETED_ASSERTION.replace("to_be_visible", "to_be_attached"))
+    findings = escalate(fix)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_retargeted_blocked_action_like_the_next_step_is_one_zero_retargeted():
+    blocked_action = 'await page.get_by_role("link", name="Missing").click()'
+    broken_input = with_extra(blocked_action, before=START_CLICK)
+    fix = with_extra(blocked_action.replace('"Missing"', '"Menu"'), before=START_CLICK)
+    findings = escalate(fix, broken_input)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Menu"')
+    assert TAG_CHANGED_JOURNEY not in {f.tag for f in findings}
+
+
+def test_escalate_retargeted_blocked_assertion_moved_to_another_gap_is_one_zero_retargeted():
+    fix = with_extra(RETARGETED_ASSERTION, before=START_CLICK)
+    findings = escalate(fix)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_retargeted_blocked_assertion_beside_a_weakened_check_is_tagged():
+    blocked = 'await expect(page.get_by_role("heading", name="Missing")).to_have_text("Hi")'
+    broken_input = with_extra(blocked, before=START_CLICK)
+    start_check = 'name="Start")).to_be_visible()'
+    fix = with_extra(blocked.replace('"Missing"', '"Welcome"'), before=START_CLICK).replace(
+        start_check, start_check.replace("to_be_visible", "to_be_attached"), 1
+    )
+    findings = escalate(fix, broken_input)
+    assert TAG_WEAKENED_CHECK in {f.tag for f in findings}, findings
+    # The weakened replacement isn't a reference assertion either, so it is
+    # tagged too (the plan accepts this: that trial already scores 0).
+    assert zero_lines(findings) == [line_of(fix, "to_be_attached"), line_of(fix, '"Welcome"')]
+
+
+def test_escalate_blocked_assertion_kept_plus_an_extra_with_its_matcher_has_no_zero():
+    fix = with_extra(BLOCKED_ASSERTION + "\n" + OTHER_HEADING)
+    findings = escalate(fix)
+    assert [f.tag for f in findings] == [TAG_ADDED_ASSERTION, TAG_ADDED_ASSERTION], findings
+    assert not any(f.severity == SEVERITY_ZERO for f in findings)
+
+
+def test_escalate_blocked_assertion_removed_plus_an_unrelated_extra_is_only_added_assertion():
+    extra = 'await expect(page.get_by_role("link", name="Start")).to_be_enabled()'
+    fix = with_extra(extra, before=START_CLICK)
+    findings = escalate(fix)
+    assert [f.tag for f in findings] == [TAG_ADDED_ASSERTION], findings
+    assert findings[0].line == line_of(fix, "to_be_enabled")
+
+
+def test_escalate_blocked_action_removed_has_no_findings():
+    blocked_action = 'await page.get_by_role("button", name="Missing").hover()'
+    broken_input = with_extra(blocked_action, before=START_CLICK)
+    assert escalate(REFERENCE, broken_input) == []
+
+
+def test_escalate_input_with_two_extra_steps_has_no_blocked_step_zero():
+    second = OTHER_HEADING.replace('"Welcome"', '"Other"')
+    broken_input = with_extra(BLOCKED_ASSERTION + "\n" + second)
+    fix = with_extra(RETARGETED_ASSERTION)
+    findings = escalate(fix, broken_input)
+    assert not any(f.severity == SEVERITY_ZERO for f in findings), findings

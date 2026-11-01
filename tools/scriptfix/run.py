@@ -36,9 +36,15 @@ from scriptfix.grade import Out
 from scriptfix.record import read_trials
 from scriptfix.replay import _DRAIN_TIMEOUT_S, _kill_tree
 from scriptfix.report import REPO_ROOT
-from scriptfix.transcript import Transcript, read_transcript
+from scriptfix.transcript import Transcript, _load_lines, read_transcript
 
 TOOLS = ("edit-only",)
+
+# The built-in tools a trial may use, passed to the CLI as `--tools` (CD
+# decision, 2026-11-01: "Allowlist, no web"). It's the seven tools Eval 01's
+# runs actually used; nothing that can reach the network. The sidecar's
+# `tools` label stays "edit-only"; this list is recorded beside it.
+TRIAL_TOOLS = ("Read", "Glob", "Grep", "Edit", "Write", "Bash", "PowerShell")
 CONTEXTS = ("none",)
 EFFORTS = ("default", "low", "medium", "high", "xhigh", "max")
 DEFAULT_TRIAL_TIMEOUT_S = 1800
@@ -258,9 +264,11 @@ def claude_argv(
 ) -> list[str]:
     """The ``claude`` argument list for one headless trial that may edit only ``allowed_file``.
 
-    The prompt is the positional right after ``-p``: ``--allowedTools`` is
-    variadic and would swallow anything after it. ``--effort`` is omitted for
-    ``default``. Raises ValueError for an effort not in ``EFFORTS``.
+    The prompt is the positional right after ``-p``: ``--allowedTools`` and
+    ``--tools`` are variadic and would swallow anything after them, so each is
+    followed by a flag. ``--tools`` carries ``TRIAL_TOOLS`` as one
+    comma-separated value. ``--effort`` is omitted for ``default``. Raises
+    ValueError for an effort not in ``EFFORTS``.
     """
     if effort not in EFFORTS:
         raise ValueError(f"unknown effort {effort!r}; choose one of {', '.join(EFFORTS)}")
@@ -270,6 +278,8 @@ def claude_argv(
         prompt,
         "--safe-mode",
         "--strict-mcp-config",
+        "--tools",
+        ",".join(TRIAL_TOOLS),
         "--model",
         model,
     ]
@@ -573,6 +583,7 @@ def run_trials(
                 "effort": effort,
                 "context": context,
                 "tools": tools,
+                "tool_list": list(TRIAL_TOOLS),
                 "runner": __version__,
                 "started": started,
                 "seconds": round(seconds, 1),
@@ -627,12 +638,43 @@ def _tool_problem(transcript: Transcript, results: dict[str, tuple[bool, str]], 
     return None
 
 
+def _init_tools(log: Path) -> list[str] | None:
+    """The ``tools`` list of the log's first ``system``/``init`` line, or None.
+
+    None means the log can't be read, has no such line, or the line has no
+    list of strings under ``tools``.
+    """
+    try:
+        lines = _load_lines(log)
+    except OSError:
+        return None
+    for obj in lines:
+        if obj.get("type") == "system" and obj.get("subtype") == "init":
+            tools = obj.get("tools")
+            if isinstance(tools, list) and all(isinstance(tool, str) for tool in tools):
+                return tools
+            return None
+    return None
+
+
+def _tools_problem(init_tools: list[str] | None) -> str | None:
+    """Why the session's tools aren't exactly ``TRIAL_TOOLS``, or None when they are."""
+    if init_tools is None:
+        return "the log has no init line listing the session's tools"
+    extra = sorted(set(init_tools) - set(TRIAL_TOOLS))
+    missing = [tool for tool in TRIAL_TOOLS if tool not in init_tools]
+    if not extra and not missing:
+        return None
+    return f"extra: {', '.join(extra) or 'none'}; missing: {', '.join(missing) or 'none'}"
+
+
 def _self_test_problems(
     transcript: Transcript | None,
     *,
     exit_code: int | None,
     timed_out: bool,
     dummy: Path,
+    init_tools: list[str] | None,
 ) -> list[tuple[str, str]]:
     """The failed checks of the self-test as ``(check, detail)``, in a fixed order."""
     problems: list[tuple[str, str]] = []
@@ -665,6 +707,9 @@ def _self_test_problems(
     else:
         if text != "after":
             problems.append(("edit", f"{dummy.name} reads {text!r}, not 'after'"))
+    detail = _tools_problem(init_tools)
+    if detail:
+        problems.append(("tools", detail))
     return problems
 
 
@@ -683,8 +728,11 @@ def self_test(
     only ``inputs/dummy.txt`` and the same environment, command line and
     allow rules as a real trial. It passes when the log has a clean result,
     a PowerShell and a Bash call both succeeded, no result says "The command
-    line is too long", no edit was denied and ``dummy.txt`` now reads
-    ``after``. The folder is kept for inspection.
+    line is too long", no edit was denied, ``dummy.txt`` now reads
+    ``after`` and the init line's tools are exactly ``TRIAL_TOOLS``. The
+    checks run in the order timeout/exit, result, powershell, bash, too-long,
+    denial, edit, tools: ``tools`` is the last one. The folder is kept for
+    inspection.
     """
     if timeout_s < 1:
         raise ValueError(f"the timeout must be at least 1 second, got {timeout_s}")
@@ -704,7 +752,9 @@ def self_test(
     exit_code, timed_out, _seconds = launch_trial(
         argv, folder=folder, log=log, stderr=stderr, env=env, timeout_s=timeout_s
     )
-    problems = _self_test_problems(_read_log(log), exit_code=exit_code, timed_out=timed_out, dummy=dummy)
+    problems = _self_test_problems(
+        _read_log(log), exit_code=exit_code, timed_out=timed_out, dummy=dummy, init_tools=_init_tools(log)
+    )
     out("SELFTEST=fail" if problems else "SELFTEST=pass")
     for check, detail in problems:
         out(f"REASON={check}: {detail}")

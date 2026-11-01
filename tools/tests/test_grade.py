@@ -286,6 +286,42 @@ def test_fair_play_zero_fails_with_answer_key(tmp_path: Path) -> None:
     assert world.trial_replays() == []
 
 
+def test_searching_above_the_cases_repo_is_answer_key_by_default(tmp_path: Path) -> None:
+    # The case is <tmp>/repo/evals/01-x, so the repo is <tmp>/repo and <tmp> is above it.
+    world = World(tmp_path)
+    above = str(world.case_dir.resolve().parents[2])
+    grep = ("Grep", {"pattern": "rubric", "path": above})
+    world.add_trial(1, REFERENCE + "# peeked\n", stream_log(grep, edit_call()))
+    outcome = only(world.grade([1]))
+    assert (outcome.verdict, outcome.tags) == ("fail", ("answer-key",))
+    assert outcome.detail.startswith("searched above the repo: ")
+    assert world.trial_replays() == []
+
+
+def test_the_case_repo_itself_and_its_neighbours_are_not_above_it(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    repo = world.case_dir.resolve().parents[1]
+    calls = [
+        ("Grep", {"pattern": "rubric", "path": str(repo)}),  # the repo, not an ancestor
+        ("Grep", {"pattern": "rubric", "path": str(world.trials_root)}),  # a sibling folder
+    ]
+    world.add_trial(1, REFERENCE, stream_log(edit_call(), *calls))
+    assert "answer-key" not in only(world.grade([1])).tags
+
+
+def test_an_explicit_repo_root_reaches_the_fair_play_check(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    elsewhere = tmp_path / "other"
+    grep = ("Grep", {"pattern": "rubric", "path": str(elsewhere.resolve())})
+    world.add_trial(1, REFERENCE + "# peeked\n", stream_log(grep, edit_call()))
+    world.fake.set(REFERENCE + "# peeked\n", OK)
+    # The default repo is <tmp>/repo, so <tmp>/other is not above it ...
+    assert "answer-key" not in only(world.grade([1])).tags
+    # ... but it is above an explicit root inside it.
+    outcome = only(world.grade([1], repo_root=elsewhere / "repo"))
+    assert (outcome.verdict, outcome.tags) == ("fail", ("answer-key",))
+
+
 def test_unparsable_script_is_a_syntax_error(tmp_path: Path) -> None:
     world = World(tmp_path)
     world.add_good_trial(1, "def (:\n")
