@@ -1,6 +1,7 @@
 # privnames-01 — a private-names check for commits
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-10-31 (oversee run, commits `ea0abe6`..`94b3bb4`
+plus the wrap-up; see `privnames-01.check-script.follow-up.md`).
 **Requested:** 2026-10-31 (refine pass; TODO.md § Next "Private-names
 check script"). Drafted by `/zmh-producer:backlog-plan-gen`.
 **Scope:**

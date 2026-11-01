@@ -33,7 +33,12 @@ to one eval (e.g. `feat(playwright-basic-debug): add rubric`).
   content only). A pushed leak can't be fully unpublished: after a history
   rewrite, GitHub still serves the old commits by SHA and lists them in the
   repo's Activity log. Only deleting the repo, or a GitHub Support request,
-  removes them.
+  removes them. Run
+  `.claude\scripts\check-private-names.ps1 -Message '<message>'` on the
+  staged change before committing; exit 0 is clean. On a hit (exit 1), fix
+  the change. Exit 2 means the local list is missing (the error says where
+  to create it). A hit already in history is reported to the CD, never
+  rewritten from a session.
 - Never stage with a blanket `add -A`/`add .` — stage named files, and
   review `git status`/`git diff --cached` before committing.
 - Reference an ADR when a commit implements a recorded decision.

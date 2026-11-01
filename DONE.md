@@ -2,6 +2,19 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-10-31** — Private-names check (oversee run of
+  `.claude/plans/DONE/privnames-01.check-script.md`):
+  - `.claude/scripts/check-private-names.ps1 -Message "<msg>"` checks the
+    staged change, the staged paths and the message. Add `-All` to also
+    sweep every tracked file and the whole history. Names come from a
+    gitignored local list (`.claude/*.local.*`), and hits print a list
+    number, never the name.
+  - It replaces the hand greps before each commit (`commit.md` § Rules),
+    and works from oversee worktrees.
+  - 23 pytest tests (460 in the gate). `-All` on the repo is clean.
+  - The task-scoping skill's per-tier failure modes are seeded, starting
+    with sonnet on pwsh scripts.
+
 - **2026-10-31** — Refine pass after grader-01b:
   - a new skill, `.claude/skills/scriptfix-grader.md` (how the grader
     decides, and how to extend it);

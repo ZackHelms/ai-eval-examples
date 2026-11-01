@@ -71,6 +71,15 @@ Learned on grader-01b's run (2026-10-31):
   `git worktree remove .claude/worktrees/<name>` and `git branch -d
   <branch>`.
 
+Learned on privnames-01's run (2026-10-31):
+
+- **Implementers run the private-names check before each commit.** From a
+  worktree it reads the main checkout's list. A worktree-isolated session
+  can't write files in the primary checkout, so the list must already exist
+  there before the run: create it from the primary checkout, untracked.
+  Spawn prompts never contain the names, only the instruction to run the
+  check (`.claude\scripts\check-private-names.ps1 -Message '<message>'`).
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task

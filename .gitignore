@@ -5,3 +5,5 @@ __pycache__/
 *.py[cod]
 *.zip
 !evals/*/inputs/**/*.zip
+# Machine-local files (private-name list, local settings): never committed.
+.claude/*.local.*

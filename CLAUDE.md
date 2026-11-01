@@ -119,7 +119,8 @@ DONE.md                   # completed-work log
   notes/        reference notes (test-site element inventory)
   plans/        feature plans (implemented plans archive to plans/DONE/)
   metrics/      oversee outcome ledger (task-tier routing data)
-  scripts/      deterministic repo tooling (oversee-ledger-summary.mjs, …)
+  scripts/      deterministic repo tooling (oversee-ledger-summary.mjs,
+                check-private-names.ps1, …)
   zmh/          zmh-producer plugin config (producer.md)
 ```
 
