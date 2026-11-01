@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **grader-01e: LLM judge** (oversee run, started 2026-11-01):
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01e.llm-judge.md`.
+  No commits landed yet; the run works on branch
+  `worktree-oversee+grader-01e`.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
