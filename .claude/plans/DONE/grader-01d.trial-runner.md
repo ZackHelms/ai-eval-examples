@@ -1,6 +1,7 @@
 # grader-01d — the trial runner (`20-run-trials.ps1`)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-01 (oversee run, commits `48a9936`..`3f30839`
+plus the wrap-up; see `grader-01d.trial-runner.follow-up.md`).
 **Requested:** 2026-10-30 (grader-01 phase D, design approved that day);
 drafted 2026-10-31 by `/zmh-producer:backlog-plan-gen`.
 **Scope:**
