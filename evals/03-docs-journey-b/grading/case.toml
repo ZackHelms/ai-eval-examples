@@ -1,0 +1,7 @@
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["locator-strict"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The Next-link click's name is shortened to Other locators, which also matches a sidebar link: a strict-mode violation (line 19)."
+fails_at = 19
+target   = "https://playwright.dev"

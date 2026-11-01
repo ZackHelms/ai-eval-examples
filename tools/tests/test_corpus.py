@@ -2,6 +2,12 @@
 
 The labels are the spec: each corpus file must produce exactly the tags
 listed for it. A file added without a label, or a label without a file, fails.
+
+Each corpus's case comes from its eval's ``grading/case.toml``. A fix case
+is graded against the reference only (``check_static(reference, fix)``); an
+escalate case also passes the eval's ``inputs/script.py`` as ``input_src``
+with ``expected="escalate"``, so its labels follow rubric-v0 § Escalate
+cases (the blocked step is kept or removed, never retargeted).
 """
 
 from __future__ import annotations
@@ -11,7 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from scriptfix.static import check_static
+from scriptfix.case import load_case
+from scriptfix.static import EXPECTED_ESCALATE, check_static
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,11 +53,19 @@ def test_corpora_exist():
 @pytest.mark.parametrize("corpus_toml, name, label", _cases())
 def test_corpus_file_has_its_labeled_tags(corpus_toml, name, label):
     corpus_dir = corpus_toml.parent
+    case = load_case(corpus_toml.parents[2])
     reference = (corpus_dir / _load(corpus_toml)["reference"]).resolve()
-    fix = corpus_dir / name
-    findings = check_static(
-        reference.read_text(encoding="utf-8"), fix.read_text(encoding="utf-8")
-    )
+    reference_src = reference.read_text(encoding="utf-8")
+    fix_src = (corpus_dir / name).read_text(encoding="utf-8")
+    if case.expected == EXPECTED_ESCALATE:
+        findings = check_static(
+            reference_src,
+            fix_src,
+            input_src=case.input_script.read_text(encoding="utf-8"),
+            expected=EXPECTED_ESCALATE,
+        )
+    else:
+        findings = check_static(reference_src, fix_src)
     listing = "\n".join(
         f"  {f.tag} [{f.severity}] line {f.line}: {f.detail}" for f in findings
     )

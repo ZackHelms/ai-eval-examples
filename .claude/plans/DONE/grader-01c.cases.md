@@ -1,6 +1,7 @@
 # grader-01c — cases 02–06, neutral capture, eval-integrity gate
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-01 (oversee run, commits `5305c8d`..`9ce71e8`
+plus the wrap-up; see `grader-01c.cases.follow-up.md`).
 **Requested:** 2026-10-30 (grader-01 phase C, design approved that day);
 drafted 2026-10-31 by `/zmh-producer:backlog-plan-gen`. It bundles two
 other backlog items: the eval static reviewer (TODO.md § Needs Zack

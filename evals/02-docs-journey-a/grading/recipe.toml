@@ -1,0 +1,8 @@
+# How this case is built: .\10-make-case.ps1 -Case evals\02-docs-journey-a
+source = "evals/01-playwright-python-basic/grading/reference/script.py"
+cut    = [19, 20]
+
+[[edit]]
+line = 18
+old  = "»"
+new  = ">"

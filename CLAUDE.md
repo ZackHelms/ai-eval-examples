@@ -68,10 +68,9 @@ one exists.
 ## Validation (the project gate — referenced everywhere as "the validation procedure")
 
 1. **Static review pre-pass** of every changed file — prefer delegating to
-   `<FILL-IN: this repo's static-reviewer agent name — e.g. an answer-leak /
-   eval-structure reviewer>` (checklist baked in; zero Blockers to pass).
-   Cheap; catches answer leaks and placeholder mismatches before spending a
-   gate run.
+   `eval-static-reviewer` (`.claude/agents/eval-static-reviewer.md`)
+   (checklist baked in; zero Blockers to pass). Cheap; catches answer
+   leaks and placeholder mismatches before spending a gate run.
 2. **Hard gate:** `.\.venv\Scripts\python.exe -m pytest` from the repo
    root (`pytest.ini` points it at `tools/tests/`); it must exit 0.
 3. **Dependency/manifest sanity** when the venv requirements or tool
@@ -136,7 +135,8 @@ outside the eval's own authoring. Nothing in `prompt.md` or `inputs/` may
 hint at the answer: no comments naming the bug, no file names like
 `fixed_*.py`, no reference-fix fragments. Script-fix cases follow ADR-0001's
 file contract (`case.toml`, `recipe.toml`, `reference/`, `corpus/`);
-capture and regeneration arrive with grader-01 phase C (`10-make-case.ps1`).
+`.\10-make-case.ps1` captures and regenerates them, recording how in
+`grading/capture.toml`.
 
 ## Working process (do not skip)
 

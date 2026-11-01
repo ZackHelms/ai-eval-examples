@@ -1,0 +1,7 @@
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["locator-text"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The Next link's name has > where the page has » (line 18)."
+fails_at = 18
+target   = "https://playwright.dev"

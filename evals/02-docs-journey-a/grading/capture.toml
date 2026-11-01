@@ -1,0 +1,10 @@
+# Written by 10-make-case.ps1 from recipe.toml; regenerate, don't edit.
+date               = "2026-11-01"
+target             = "https://playwright.dev"
+users              = 1
+iterations         = 1
+python             = "3.12.1"
+playwright         = "1.64.1"
+reference_exit     = 0
+input_exit         = 1
+input_failing_line = 18

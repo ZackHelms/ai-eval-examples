@@ -1,0 +1,6 @@
+# How this case is built: .\10-make-case.ps1 -Case evals\06-docs-journey-e
+source = "evals/01-playwright-python-basic/grading/reference/script.py"
+
+[[edit]]
+line   = 21
+insert = "await expect(page.get_by_role(\"link\", name=\"Edit this page\")).to_be_visible()"

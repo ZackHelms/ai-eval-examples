@@ -1,0 +1,7 @@
+# How this case is built: .\10-make-case.ps1 -Case evals\03-docs-journey-b
+source = "evals/01-playwright-python-basic/grading/reference/script.py"
+
+[[edit]]
+line = 19
+old  = "Next Other locators »"
+new  = "Other locators"

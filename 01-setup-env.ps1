@@ -22,9 +22,19 @@
         . .\01-setup-env.ps1
     Leave the venv with `deactivate`.
 
+.PARAMETER VenvDir
+    Build or verify this venv instead of the repo's .venv\ (a relative path
+    resolves against your current directory). Every step applies to it, and
+    -Recreate deletes it.
+
+.PARAMETER NoActivate
+    Skip step 5: leave your session as it is and end with a Ready line that
+    names the venv without claiming it is active.
+
 .PARAMETER Recreate
-    Delete .venv\ and rebuild it (e.g. after a Python upgrade, or to drop
-    packages that were removed from requirements.txt).
+    Delete the venv folder (.venv\ unless -VenvDir is given) and rebuild it
+    (e.g. after a Python upgrade, or to drop packages that were removed from
+    requirements.txt).
 
 .PARAMETER Force
     Reinstall requirements.txt even if it hasn't changed.
@@ -42,9 +52,15 @@
 .EXAMPLE
     .\01-setup-env.ps1 -Recreate
     Throw away .venv\ and rebuild it from requirements.txt.
+
+.EXAMPLE
+    .\01-setup-env.ps1 -VenvDir $env:LOCALAPPDATA\pwrun\venv -NoActivate
+    Build or verify the capture venv used by 10-make-case.ps1, leaving your session untouched.
 #>
 [CmdletBinding()]
 param(
+    [string]$VenvDir,
+    [switch]$NoActivate,
     [switch]$Recreate,
     [switch]$Force,
     [Alias('h')]
@@ -63,6 +79,10 @@ if ($UnknownArgs) {
     throw "Unknown argument(s): $UnknownArgs. Run .\$(Split-Path -Leaf $PSCommandPath) -h for usage."
 }
 
+# A relative -VenvDir means relative to the caller's current directory; resolve
+# it here, before anything can change directory.
+$resolvedVenvDir = $VenvDir ? [IO.Path]::GetFullPath($VenvDir, $PWD.Path) : $null
+
 # The work runs in a child scope so StrictMode, $ErrorActionPreference and the
 # helper variables don't leak into your session when this file is dot-sourced.
 & {
@@ -72,7 +92,9 @@ if ($UnknownArgs) {
     $pythonVersion = '3.12'            # repo pin; ADR pending (TODO.md § Needs Zack)
     $browsers      = @('chromium')     # Playwright browsers the current evals use
     $repoRoot      = $PSScriptRoot
-    $venvDir       = Join-Path $repoRoot '.venv'
+    $isDefaultVenv = -not $resolvedVenvDir
+    $venvDir       = $isDefaultVenv ? (Join-Path $repoRoot '.venv') : $resolvedVenvDir
+    $venvName      = $isDefaultVenv ? '.venv' : $venvDir
     $binDir        = Join-Path $venvDir ($IsWindows ? 'Scripts' : 'bin')
     $venvPython    = Join-Path $binDir ($IsWindows ? 'python.exe' : 'python')
     $requirements  = Join-Path $repoRoot 'requirements.txt'
@@ -125,13 +147,13 @@ if ($UnknownArgs) {
             throw "Python $pythonVersion not found (tried py -$pythonVersion, python$pythonVersion, python, python3). " +
                   "Install it - on Windows: winget install Python.Python.$pythonVersion - then re-run."
         }
-        Write-Step "Creating .venv from $basePython"
+        Write-Step "Creating $venvName from $basePython"
         Invoke-Checked $basePython -m venv $venvDir
     }
 
     $venvVersion = & $venvPython -c 'import sys; print(sys.version.split()[0])'
     if ($LASTEXITCODE -ne 0 -or $venvVersion -notlike "$pythonVersion.*") {
-        throw ".venv runs Python '$venvVersion' but the repo pins $pythonVersion.x (or .venv is broken). Re-run with -Recreate."
+        throw "$venvName runs Python '$venvVersion' but the repo pins $pythonVersion.x (or it is broken). Re-run with -Recreate."
     }
 
     # pip is slow even when there's nothing to do, so skip it unless
@@ -139,7 +161,7 @@ if ($UnknownArgs) {
     $requirementsHash = (Get-FileHash $requirements -Algorithm SHA256).Hash
     $installedHash = (Test-Path $stampFile) ? (Get-Content $stampFile -Raw).Trim() : ''
     if ($Force -or $requirementsHash -ne $installedHash) {
-        Write-Step 'Installing requirements.txt into .venv'
+        Write-Step "Installing requirements.txt into $venvName"
         Invoke-Checked $venvPython -m pip install --disable-pip-version-check -r $requirements
         Set-Content $stampFile $requirementsHash
     } else {
@@ -164,6 +186,11 @@ with sync_playwright() as p:
     browser.close()
 '@
     Invoke-Checked $venvPython -c $smokeTest
+
+    if ($NoActivate) {
+        Write-Host "==> Ready: $venvName (not activated)" -ForegroundColor Green
+        return
+    }
 
     # Activate.ps1 sets $env:PATH/$env:VIRTUAL_ENV (process-wide) and defines
     # global `deactivate`/`prompt` functions, so activation outlives this scope.

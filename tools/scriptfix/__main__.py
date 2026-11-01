@@ -1,8 +1,9 @@
-"""Command line: ``python -m scriptfix grade ...`` and ``python -m scriptfix report``.
+"""Command line: ``python -m scriptfix grade ...``, ``report`` and ``make-case``.
 
-Wiring only: argument parsing here, the work in ``grade.py`` and
-``report.py``. Exit codes: 0 success, 1 a control replay was surprising
-(the batch is void), 2 usage errors.
+Wiring only: argument parsing here, the work in ``grade.py``, ``report.py``
+and ``makecase.py``. Exit codes: 0 success, 1 a control replay was
+surprising (the batch is void) or a make-case capture was (nothing written),
+2 usage errors.
 """
 
 from __future__ import annotations
@@ -13,7 +14,8 @@ from pathlib import Path
 
 from scriptfix import RUBRIC, __version__
 from scriptfix.grade import grade, parse_runs
-from scriptfix.report import report
+from scriptfix.makecase import make_case
+from scriptfix.report import REPO_ROOT, report
 
 PROG = "python -m scriptfix"
 
@@ -42,9 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
             "grade saved trials of a script-fix case and report pass rates. "
             "Everything except the LLM judge."
         ),
-        epilog="Exit codes: 0 ok, 1 a control replay was surprising, 2 usage error.",
+        epilog=(
+            "Exit codes: 0 ok, 1 a control replay or a make-case capture was "
+            "surprising, 2 usage error."
+        ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{grade,report}", required=True)
+    sub = parser.add_subparsers(dest="command", metavar="{grade,report,make-case}", required=True)
 
     grader = sub.add_parser(
         "grade",
@@ -92,6 +97,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="an eval directory (repeatable; default: every evals/*/ with a grading/trials.jsonl)",
     )
+
+    maker = sub.add_parser(
+        "make-case",
+        help="build a case from its recipe and capture its evidence",
+        description=(
+            "Build a case's reference and broken input from <case>/grading/recipe.toml, "
+            "replay each once (the reference first; the input in a neutral temp folder, "
+            "with the capture venv's python) and, only if the reference passes and the "
+            "input fails at the case's fails_at line, write the scripts, prompt.md, "
+            "inputs/results.txt, inputs/script.pwtrace.zip and grading/capture.toml. "
+            "A surprise writes nothing. Exactly two replays, one at a time; run only "
+            "single replays against public sites."
+        ),
+    )
+    maker.add_argument("--case", required=True, type=Path, help="the eval directory, e.g. evals/02-docs-journey-a")
+    maker.add_argument(
+        "--python",
+        required=True,
+        type=Path,
+        help="the capture venv's python (not checked with --dry-run)",
+    )
+    maker.add_argument("--timeout", type=int, default=120, help="seconds before a replay is killed (default: 120)")
+    maker.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the diff reference -> input and the planned replays; replay and write nothing",
+    )
     return parser
 
 
@@ -126,6 +158,24 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:  # a bad case.toml or trials.jsonl
             parser.error(str(exc))
         return result.exit_code
+
+    if args.command == "make-case":
+        if not args.case.is_dir():
+            parser.error(f"--case is not a directory: {args.case}")
+        if args.timeout < 1:
+            parser.error("--timeout must be at least 1 second")
+        if not args.dry_run and not args.python.is_file():
+            parser.error(f"--python is not a file: {args.python}")
+        try:
+            return make_case(
+                args.case,
+                repo_root=REPO_ROOT,
+                python=args.python,
+                timeout_s=args.timeout,
+                dry_run=args.dry_run,
+            )
+        except ValueError as exc:  # a bad case.toml or recipe.toml
+            parser.error(str(exc))
 
     for case in args.case or []:
         if not case.is_dir():

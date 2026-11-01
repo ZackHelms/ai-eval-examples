@@ -86,19 +86,28 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
         os.killpg(process.pid, signal.SIGKILL)
 
 
-def replay(script: Path, *, python: Path, timeout_s: int = 120) -> ReplayResult:
+def replay(
+    script: Path, *, python: Path, timeout_s: int = 120, workdir: Path | None = None
+) -> ReplayResult:
     """Run ``script`` once with ``python`` in a clean temp copy.
 
-    The copy lives at ``<temp>/scriptfix/<key>/script.py`` where ``<key>`` is
-    the first 12 hex digits of the script's SHA-256; the directory is
-    recreated first. Runs ``python -X utf8 script.py`` (``-I`` would ignore
-    PYTHONUTF8, and ``-X utf8`` is what lets ``»`` print) with the inherited
-    environment. On timeout the whole process tree is killed and whatever
-    output exists is returned with ``exit_code=None``.
+    By default the copy lives at ``<temp>/scriptfix/<key>/script.py`` where
+    ``<key>`` is the first 12 hex digits of the script's SHA-256. Given
+    ``workdir``, it lives at ``<workdir>/script.py`` instead (the capture uses
+    a neutral folder so the evidence never names the repo). Either way the
+    directory is removed and recreated first, and is left in place afterwards
+    (``output.txt`` and a trace stay readable). Runs
+    ``python -X utf8 script.py`` (``-I`` would ignore PYTHONUTF8, and
+    ``-X utf8`` is what lets ``»`` print) with the inherited environment. On
+    timeout the whole process tree is killed and whatever output exists is
+    returned with ``exit_code=None``.
     """
     data = Path(script).read_bytes()
-    key = hashlib.sha256(data).hexdigest()[:12]
-    workdir = Path(tempfile.gettempdir()) / "scriptfix" / key
+    if workdir is None:
+        key = hashlib.sha256(data).hexdigest()[:12]
+        workdir = Path(tempfile.gettempdir()) / "scriptfix" / key
+    else:
+        workdir = Path(workdir)
     if workdir.exists():
         shutil.rmtree(workdir)
     workdir.mkdir(parents=True)

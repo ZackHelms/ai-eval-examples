@@ -2,6 +2,28 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — grader-01 phase C, cases 02–06 (oversee run of
+  `.claude/plans/DONE/grader-01c.cases.md`):
+  - `.\10-make-case.ps1 -Case evals\<slug> [-DryRun]`
+    (`tools/scriptfix/makecase.py`) builds a script-fix case from its
+    `grading/recipe.toml`. It cuts and edits a source script into the
+    reference and the input, then replays both, one at a time. The input
+    replays in a neutral folder (`%TEMP%\pwrun`) with a capture venv
+    outside the repo (`%LOCALAPPDATA%\pwrun\venv`, via
+    `01-setup-env.ps1 -VenvDir … -NoActivate`). It writes the evidence,
+    `prompt.md` and `grading/capture.toml`; a surprise writes nothing.
+  - Five generated cases, `evals/02-docs-journey-a` to
+    `evals/06-docs-journey-e`, one break each, with labeled corpora.
+    Case 06 is the first escalate case. Each was captured twice with the
+    same `fails_at`. The exact breaks live only in each case's `grading/`.
+  - `tools/tests/test_eval_integrity.py` checks every eval (10 checks;
+    generated cases get all of them, Eval 01 the structural ones).
+  - Rubric-v0's escalate item 2 is now enforced: a retargeted blocked step
+    is a zero (`static.py`).
+  - The `eval-static-reviewer` agent is the validation procedure's
+    step 1. The pre-pass on all five cases found 0 Blockers.
+  - The gate is at 694 passed and 6 skipped (it was 460).
+
 - **2026-10-31** — Private-names check (oversee run of
   `.claude/plans/DONE/privnames-01.check-script.md`):
   - `.claude/scripts/check-private-names.ps1 -Message "<msg>"` checks the

@@ -19,7 +19,7 @@ from scriptfix.detect import (
     detect,
 )
 from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
-from scriptfix.journey import TAG_CHANGED_JOURNEY
+from scriptfix.journey import TAG_ADDED_ASSERTION, TAG_CHANGED_JOURNEY, TAG_RETARGETED
 from scriptfix.static import check_static
 
 # Every body below runs inside ``async def run(page, context):`` after these.
@@ -691,3 +691,70 @@ def test_escalate_still_runs_detectors_against_the_reference():
     fix = broken_input + "\ntime.sleep(1)\n"
     findings = check_static(REFERENCE, fix, input_src=broken_input, expected="escalate")
     assert [f.tag for f in findings] == [TAG_SLEEP]
+
+
+# --- escalate: the blocked step is kept or removed, never retargeted --------
+
+START_CLICK = 'await page.get_by_role("link", name="Start").click()'
+# The escalate input is the reference plus one blocked step, as case 06 is.
+BLOCKED_ASSERTION = 'await expect(page.get_by_role("heading", name="Missing")).to_be_visible()'
+BLOCKED_INPUT = with_extra(BLOCKED_ASSERTION)
+RETARGETED_ASSERTION = BLOCKED_ASSERTION.replace('"Missing"', '"Welcome"')
+
+
+def escalate(fix: str, broken_input: str = BLOCKED_INPUT):
+    return check_static(REFERENCE, fix, input_src=broken_input, expected="escalate")
+
+
+def test_escalate_retargeted_blocked_assertion_is_one_zero_retargeted():
+    fix = with_extra(RETARGETED_ASSERTION)
+    # Without the input, the retargeted step is only an extra assertion.
+    assert [f.tag for f in check_static(REFERENCE, fix)] == [TAG_ADDED_ASSERTION]
+    findings = escalate(fix)
+    assert [f.tag for f in findings] == [TAG_RETARGETED], findings
+    assert findings[0].severity == SEVERITY_ZERO
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_blocked_step_removed_has_no_findings():
+    assert escalate(REFERENCE) == []
+
+
+def test_escalate_blocked_step_kept_is_only_an_added_assertion():
+    findings = escalate(BLOCKED_INPUT)
+    assert [f.tag for f in findings] == [TAG_ADDED_ASSERTION], findings
+    assert findings[0].line == line_of(BLOCKED_INPUT, '"Missing"')
+    assert not any(f.severity == SEVERITY_ZERO for f in findings)
+
+
+def test_escalate_blocked_step_kept_with_an_unrelated_extra_assertion_has_no_zero():
+    extra = 'await expect(page.get_by_role("link", name="Start")).to_be_enabled()'
+    fix = BLOCKED_INPUT.replace(START_CLICK, extra + "\n    " + START_CLICK, 1)
+    findings = escalate(fix)
+    assert [(f.tag, f.line) for f in findings] == [
+        (TAG_ADDED_ASSERTION, line_of(fix, "to_be_enabled")),
+        (TAG_ADDED_ASSERTION, line_of(fix, '"Missing"')),
+    ], findings
+    assert not any(f.severity == SEVERITY_ZERO for f in findings)
+
+
+def test_escalate_retargeted_blocked_assertion_plus_sleep():
+    fix = with_extra(RETARGETED_ASSERTION + "\nawait asyncio.sleep(1)")
+    findings = escalate(fix)
+    assert [(f.tag, f.severity) for f in findings] == [
+        (TAG_RETARGETED, SEVERITY_ZERO),
+        (TAG_SLEEP, SEVERITY_ZERO),
+    ], findings
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_retargeted_blocked_action_is_one_zero_retargeted():
+    blocked_action = 'await page.get_by_role("button", name="Missing").hover()'
+    broken_input = with_extra(blocked_action, before=START_CLICK)
+    fix = with_extra(blocked_action.replace('"Missing"', '"Menu"'), before=START_CLICK)
+    # Against the reference alone, the extra path step changes the journey.
+    assert TAG_CHANGED_JOURNEY in {f.tag for f in check_static(REFERENCE, fix)}
+    findings = escalate(fix, broken_input)
+    assert [f.tag for f in findings] == [TAG_RETARGETED], findings
+    assert findings[0].severity == SEVERITY_ZERO
+    assert findings[0].line == line_of(fix, '"Menu"')

@@ -210,6 +210,38 @@ def test_replay_runs_in_a_temp_copy_and_leaves_the_original_directory_alone(
     assert not tmp_path.resolve() in cwd.parents
 
 
+def test_workdir_option_runs_the_copy_in_the_given_folder(tmp_path: Path) -> None:
+    script = write_script(
+        tmp_path,
+        """\
+        import os
+        from pathlib import Path
+
+        Path("trace.zip").write_text("x")
+        print(os.getcwd())
+        """,
+    )
+    workdir = tmp_path / "neutral" / "run"
+    workdir.mkdir(parents=True)
+    (workdir / "junk.txt").write_text("left over", encoding="utf-8")
+    result = replay(script, python=PYTHON, timeout_s=30, workdir=workdir)
+    assert result.exit_code == 0
+    assert (workdir / "script.py").read_bytes() == script.read_bytes()
+    assert not (workdir / "junk.txt").exists()
+    assert (workdir / "output.txt").is_file()
+    assert (workdir / "trace.zip").is_file()  # the script's own output stays readable
+    assert Path(result.output.strip()).resolve() == workdir.resolve()
+    default_root = (Path(tempfile.gettempdir()) / "scriptfix").resolve()
+    assert default_root not in workdir.resolve().parents
+
+
+def test_workdir_that_does_not_exist_yet_is_created(tmp_path: Path) -> None:
+    script = write_script(tmp_path, 'print("hi")\n')
+    workdir = tmp_path / "a" / "b"
+    assert replay(script, python=PYTHON, timeout_s=30, workdir=workdir).exit_code == 0
+    assert (workdir / "script.py").is_file()
+
+
 def test_each_replay_starts_clean(tmp_path: Path) -> None:
     script = write_script(
         tmp_path,

@@ -1,0 +1,6 @@
+# How this case is built: .\10-make-case.ps1 -Case evals\05-docs-journey-d
+source = "evals/01-playwright-python-basic/grading/reference/script.py"
+
+[[edit]]
+line   = 19
+delete = true

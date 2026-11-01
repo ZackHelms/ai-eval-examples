@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **grader-01c: cases 02–06** — oversee run of
-  `.claude/plans/grader-01c.cases.md`, started 2026-11-01 by
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01c.cases.md`
-  on branch `worktree-oversee+grader-01c`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -24,28 +21,14 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   One plan per phase: A decide (done: ADR-0001, `rubrics/script-fix/`) →
   B deterministic grader + pytest gate + Eval 01 calibration (done
   2026-10-31: `tools/scriptfix/`, `30-grade-trials.ps1`,
-  `.claude/plans/DONE/grader-01b.deterministic-grader.md`) → **next:** C
-  cases 02–06 and D trial runner, both plan-ready (the two entries below;
-  independent of each other) → E LLM judge (resolves Eval 01's
-  `pending-judge` runs 10 and 12; plan it once C lands, since it needs
-  the cases' judge items) → F pilot. Absorbs the former § Next items Eval
-  01 grader, Capture script, Trial runner script and Eval: impossible
+  `.claude/plans/DONE/grader-01b.deterministic-grader.md`) → C cases
+  02–06 (done 2026-11-01: `10-make-case.ps1`, `evals/02-docs-journey-a`
+  to `evals/06-docs-journey-e`, the eval-integrity gate and the
+  `eval-static-reviewer` agent, `.claude/plans/DONE/grader-01c.cases.md`)
+  → **next:** D trial runner (plan-ready, below) and E LLM judge (below;
+  independent of each other) → F pilot. Absorbs the former § Next items
+  Eval 01 grader, Capture script, Trial runner script and Eval: impossible
   locator.
-- **grader-01 phase C: cases 02–06.** Neutral-folder capture,
-  `10-make-case.ps1`, five recipe-built cases with labeled corpora (case 06
-  replaces the impossible-locator eval and is the first escalate case),
-  and the escalate journey rule. Bundled into it:
-  - the **eval static reviewer** (from § Needs Zack, AGENT-OPP).
-    *Decided 2026-10-31 (the CD): "Approve, in phase C".* Task 1 writes
-    `.claude/agents/eval-static-reviewer.md`, so the new cases get
-    reviewed in the same run;
-  - the **eval-integrity gate** (from § Next): pytest checks over every
-    eval.
-
-  *Depends on:* phase B (done).
-
-  **Plan ready (2026-10-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01c.cases.md`
 - **grader-01 phase D: trial runner.** `20-run-trials.ps1` runs N
   headless one-shot trials of a case, one at a time, with the launcher
   gotchas built in. It writes a subject sidecar that the grader reads, and
@@ -55,6 +38,12 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
   **Plan ready (2026-10-31)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/grader-01d.trial-runner.md`
+- **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
+  (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
+  escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
+  and 12. The cases' judge items exist now (phase C's corpora).
+  *Depends on:* phase C (done). Not planned yet: run
+  `/zmh-producer:backlog-plan-gen` for it.
 
 <!-- --- -->
 
@@ -79,8 +68,16 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   record/codegen, and the local test site for single-user runs (§ Next);
   (d) record+codegen vs. hand-written scripts — Eval 01 used codegen
   (`--target python-async`); (e) per-eval file contract — settled for
-  script-fix cases by ADR-0001 (capture lands with grader-01 phase C). Outcome: an ADR + the matching `<FILL-IN>`s in CLAUDE.md and
-  `.claude/standards/` resolved.
+  script-fix cases by ADR-0001 (capture landed with grader-01 phase C:
+  `10-make-case.ps1`, `grading/capture.toml`). Outcome: an ADR + the
+  matching `<FILL-IN>`s in CLAUDE.md and `.claude/standards/` resolved.
+- **Your user-profile path in captured evidence** (grader-01c,
+  `.claude/plans/DONE/grader-01c.cases.follow-up.md` item 10). Every
+  case's `inputs/results.txt` and trace name `C:\Users\<you>\AppData\…`
+  (the capture venv, Python's stdlib, `%TEMP%\pwrun`), as Eval 01's
+  evidence already did. Options: keep it (it isn't a product or work
+  name); capture under a neutral local account; or wait for the isolated
+  trial environment (§ Next) and capture there.
 
 <!-- --- -->
 
@@ -112,6 +109,15 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   unclassified timeouts, and answer-key searches above the repo.
   *Depends on:* nothing; best before phase F's pilot.
 
+  **Not in its plan yet:** grader-01c's grader gaps
+  (`.claude/plans/DONE/grader-01c.cases.follow-up.md` § Deferred): four
+  escalate-rule shapes that slip past the new rule, the untagged
+  retarget after a path divergence, and `30-grade-trials.ps1`'s relative
+  `-Case` and exit-1 usage errors. The plan's anchors still match HEAD
+  (grader-01c didn't touch them). To fold these in, re-draft it first
+  with `/zmh-producer:backlog-plan-gen` (recommended); otherwise they
+  need a later plan.
+
   **Plan ready (2026-10-31)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
 - **Isolated trial environment** — a container/WSL distro holding only
@@ -126,10 +132,11 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 - **Complete the scaffold's `<FILL-IN>` markers** (left by
   `/zmh-producer:studio-init`; most resolve at the first-eval level-set):
-  - [ ] `CLAUDE.md` — stack/version ADR pin; static-reviewer agent name;
-        codegen workflow (Tech stack). Done: trial-run loop + Playtest
-        SOP, `skills/` list, file contract for script-fix cases
-        (ADR-0001), multi-user approach (none for now, 2026-10-31)
+  - [ ] `CLAUDE.md` — stack/version ADR pin; codegen workflow (Tech
+        stack). Done: trial-run loop + Playtest SOP, `skills/` list, file
+        contract for script-fix cases (ADR-0001), multi-user approach
+        (none for now, 2026-10-31), static-reviewer agent name
+        (`eval-static-reviewer`, grader-01c)
   - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
         venv bootstrap; refine pass after grader-01b)
   - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
@@ -140,8 +147,8 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
         (ADR-0001)
   - [x] `.claude/standards/testing.md` — test/check runner; test directory (grader-01b)
   - [ ] `.claude/standards/review.md` — static-reviewer version/API pins
-  - [ ] `.claude/agents/README.md` — specialist agents table; anticipated
-        agents
+  - [ ] `.claude/agents/README.md` — anticipated agents (the specialist
+        table is done: `eval-static-reviewer`, grader-01c)
   - [ ] `.claude/checklists/README.md` — per-workflow checklists (as
         workflows grow)
   - [x] `.claude/skills/task-scoping.md` — per-tier failure modes (seeded

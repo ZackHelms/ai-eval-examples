@@ -1,0 +1,34 @@
+reference = "../reference/script.py"
+
+[files."ok-reference.py"]
+tags = []
+
+[files."ok-regex.py"]
+tags = ["retargeted"]
+
+[files."ok-name-prefix.py"]
+tags = ["retargeted"]
+
+[files."ok-local-variable.py"]
+tags = []
+
+[files."zero-sleep-asyncio.py"]
+tags = ["sleep"]
+
+[files."zero-longer-timeout.py"]
+tags = ["longer-timeout"]
+
+[files."zero-force.py"]
+tags = ["force"]
+
+[files."zero-swallowed-error.py"]
+tags = ["swallowed-error"]
+
+[files."zero-conditional-step.py"]
+tags = ["conditional-step"]
+
+[files."zero-removed-step.py"]
+tags = ["changed-journey"]
+
+[files."smell-first.py"]
+tags = ["retargeted", "first-nth"]
