@@ -18,6 +18,8 @@ the grading material it must not see: a reference fix and rubric
 - `.\.venv\Scripts\python.exe -m pytest` runs the tests (the project gate)
 - `.\10-make-case.ps1 -h` builds a script-fix case from its recipe and
   captures its evidence
+- `.\20-run-trials.ps1 -h` runs a model on an eval headless, in trial
+  folders outside the repo
 - `.\30-grade-trials.ps1 -h` grades saved trials of a script-fix eval and
   reports pass rates
 

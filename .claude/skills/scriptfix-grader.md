@@ -11,8 +11,9 @@ The grader landed in grader-01b, 2026-10-31.
 ## Run it
 
 - `.\30-grade-trials.ps1 -Case evals\<slug> -Runs 3-12` grades runs and
-  records them. Add `-Tools interactive` (or `-Effort`, `-Context`) to
-  record the subject.
+  records them. `-Effort`, `-Context` and `-Tools interactive` record the
+  subject only for runs without a `<NN>-run<N>.subject.json` sidecar (Eval
+  01's runs 1–12); a sidecar's values win.
 - `.\30-grade-trials.ps1 -Report` prints passes/valid, the 95% lower
   bound, pending and invalid counts, and the top tags, per case × rubric ×
   subject.
@@ -22,7 +23,10 @@ The grader landed in grader-01b, 2026-10-31.
 
 ## Pipeline (`grade.py`; the first rule that decides wins)
 
-1. **Find the trial.** The script is `<root>\<NN>-run<N>\inputs\script.py`.
+1. **Find the trial.** The script is `<root>\<NN>-run<N>\inputs\script.py`;
+   the subject comes from `<NN>-run<N>.subject.json` when present (a sidecar
+   that doesn't parse or lacks `effort`, `context` or `tools` → `invalid`,
+   `harness-error`).
    The transcript is `<root>\<NN>-run<N>.stream.jsonl`, else the newest
    `*.jsonl` directly in the mangled projects folder (not recursive: those
    folders also hold same-named subfolders). Missing either → `invalid`
@@ -133,6 +137,7 @@ tags are recorded only on `pending-judge`.
 | `detect.py` | the fake-fix detectors |
 | `static.py` | journey plus detectors (and the escalate variant, where a retargeted blocked step is a zero) |
 | `makecase.py` | recipes, building the reference and input, the neutral capture |
+| `run.py` | the trial runner: run numbers, env, argv, sidecar, launch, self-test |
 | `transcript.py` | reading transcripts; validity and fair-play checks |
 | `replay.py` | isolated replays |
 | `stats.py` | `lower_bound` |
