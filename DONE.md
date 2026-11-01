@@ -2,6 +2,14 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — Decided (the CD, at a `/zmh-producer:backlog-plan-gen`
+  interview): the Windows user-profile path in captured evidence stays.
+  Each case's `inputs/results.txt` and trace name `C:\Users\<you>\AppData\…`
+  (the capture venv, Python's standard library, `%TEMP%\pwrun`), as Eval
+  01's evidence already did. It isn't a product or work name
+  (`.claude/plans/DONE/grader-01c.cases.follow-up.md` item 10). No
+  recapture.
+
 - **2026-11-01** — grader-01 phase D, the trial runner (oversee run of
   `.claude/plans/DONE/grader-01d.trial-runner.md`):
   - `.\20-run-trials.ps1 -Case evals\<slug> -Model <id> -Count N`

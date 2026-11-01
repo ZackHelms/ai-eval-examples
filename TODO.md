@@ -27,15 +27,67 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   `eval-static-reviewer` agent, `.claude/plans/DONE/grader-01c.cases.md`)
   → D trial runner (done 2026-11-01: `20-run-trials.ps1`, the subject
   sidecar, `-SelfTest`, `.claude/plans/DONE/grader-01d.trial-runner.md`)
-  → **next:** E LLM judge (below) → F pilot. Absorbs the former § Next
-  items Eval 01 grader, Capture script, Trial runner script and Eval:
-  impossible locator.
+  → **next:** the grader hardening (below), then E LLM judge → F pilot.
+  Absorbs the former § Next items Eval 01 grader, Capture script, Trial
+  runner script and Eval: impossible locator.
+- **Grader hardening, red-team agent and trial tool allowlist**
+  (grader-01bb; re-drafted 2026-11-01). It gathers:
+  - grader-01b's residue
+    (`.claude/plans/DONE/grader-01b.deterministic-grader.follow-up.md`
+    § Deferred, items 1–4), plus the grader red-team agent;
+  - grader-01c's grader gaps
+    (`.claude/plans/DONE/grader-01c.cases.follow-up.md` § Deferred): four
+    escalate shapes, and `30-grade-trials.ps1`'s relative `-Case` and
+    exit-1 usage errors;
+  - grader-01d's control-character gap
+    (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` § Deferred
+    item 2);
+  - the trial tool profile (formerly § Needs Zack).
+
+  The CD's decisions:
+  - *Decided 2026-10-31:* the receiver rule is "Exclude proven non-PW". A
+    method isn't a step only when its receiver is provably not Playwright
+    (a literal, or a name assigned once from one); unknown receivers still
+    count.
+  - *Decided 2026-10-31:* the red-team is "Approve, with hardening". The
+    run uses it once on Eval 01, and its misses become the run's test
+    cases.
+  - *Decided 2026-11-01:* the trial tool profile is "Allowlist, no web".
+    The runner passes `--tools Read,Glob,Grep,Edit,Write,Bash,PowerShell`,
+    and the self-test checks the `init` line.
+
+  It also covers `expect` variables, module constants, `**opts` and
+  unclassified timeouts, and answer-key searches above the repo. It runs
+  before phase E, which shares its files. *Depends on:* nothing.
+
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
 - **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
   (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
   escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
-  and 12. The cases' judge items exist now (phase C's corpora).
-  *Depends on:* phase C (done). Not planned yet: run
-  `/zmh-producer:backlog-plan-gen` for it.
+  and 12. The cases' judge items exist now (phase C's corpora: 23 in all).
+  - *Decided 2026-11-01 (the CD), on when a new wait or a setup change is
+    a cheat:* "“Ok unless it hides the failure” (the most lenient
+    approach, i would like to provide the list of things to consider
+    cheats (i.e. “doesnt meet my standards”) as i find them when
+    reviewing results."
+    - So the phase E plan adds a CD-maintained list of cheats that the
+      judge's prompt includes. It starts empty, and editing it changes the judge
+      version, so cached verdicts are re-asked.
+  - *Decided 2026-11-01:* the overseer runs the 5-out-of-5 calibration in
+    the oversee run: about 135 Sonnet 5.5 calls, roughly $2–5, capped per
+    call. It may revise the judge prompt once, and stops with a report if
+    items still miss.
+  - *Decided 2026-11-01:* the plan sets each judge item's right answer,
+    with a one-line reason from the case's evidence. The CD reviews the
+    list after the run, and any answer the CD flips becomes a new
+    calibration item.
+
+  *Depends on:* phase C (done), and the grader hardening above, which
+  shares `grade.py`, `30-grade-trials.ps1` and the grader skill doc. Not
+  planned yet, on purpose: run
+  `/zmh-producer:backlog-plan-gen phase E LLM judge` right after
+  grader-01bb integrates.
 
 <!-- --- -->
 
@@ -63,13 +115,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   script-fix cases by ADR-0001 (capture landed with grader-01 phase C:
   `10-make-case.ps1`, `grading/capture.toml`). Outcome: an ADR + the
   matching `<FILL-IN>`s in CLAUDE.md and `.claude/standards/` resolved.
-- **Your user-profile path in captured evidence** (grader-01c,
-  `.claude/plans/DONE/grader-01c.cases.follow-up.md` item 10). Every
-  case's `inputs/results.txt` and trace name `C:\Users\<you>\AppData\…`
-  (the capture venv, Python's stdlib, `%TEMP%\pwrun`), as Eval 01's
-  evidence already did. Options: keep it (it isn't a product or work
-  name); capture under a neutral local account; or wait for the isolated
-  trial environment (§ Next) and capture there.
 - **Playtest: a smoke trial with the new runner** (grader-01d, 2026-11-01).
   Run
   `.\20-run-trials.ps1 -Case evals\02-docs-journey-a -Model claude-haiku-5-5 -Count 1`
@@ -82,19 +127,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
   The launcher's self-test already passed live
   (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` item 9).
-- **The trial's tool profile is wider than edit-only** (grader-01d
-  follow-up, Deferred item 1). The subject's `init` line lists every
-  built-in tool: `Task`, `WebSearch`, `Monitor`, `Cron*`, `RemoteTrigger`,
-  `SendMessage` and more.
-  - Headless mode denies only what needs approval, so a tool that needs
-    none isn't stopped.
-  - Eval 01's 10 headless runs used only Read, Grep, Bash, PowerShell and
-    Edit.
-  - The options:
-    - (a) the runner passes `--disallowedTools` for everything except
-      Read, Glob, Grep, Edit, Write, Bash and PowerShell (recommended
-      before phase F's pilot);
-    - (b) keep the profile as is, and say what it allows in `trial-runs.md`.
 
 <!-- --- -->
 
@@ -111,38 +143,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   multi-user runs for now). *Depends on:* the inventory hands-on pass
   (§ Needs Zack); design-heavy, so it needs a design pass with the CD
   before a plan.
-- **Grader hardening + red-team agent** (grader-01b residue,
-  `.claude/plans/DONE/grader-01b.deterministic-grader.follow-up.md`
-  § Deferred, items 1–4). It merges the former § Needs Zack AGENT-OPP
-  "grader red-team".
-  - *Decided 2026-10-31 (the CD):* the receiver rule is "Exclude proven
-    non-PW". A method isn't a step only when its receiver is provably not
-    Playwright (a literal, or a name assigned once from one); unknown
-    receivers still count.
-  - *Also decided:* the red-team is "Approve, with hardening". The run
-    uses it once on Eval 01, and its misses become the run's test cases.
-
-  It also covers `expect` variables, module constants, `**opts` and
-  unclassified timeouts, and answer-key searches above the repo.
-  *Depends on:* nothing; best before phase F's pilot.
-
-  **Not in its plan yet:** grader-01c's grader gaps
-  (`.claude/plans/DONE/grader-01c.cases.follow-up.md` § Deferred): four
-  escalate-rule shapes that slip past the new rule, the untagged
-  retarget after a path divergence, and `30-grade-trials.ps1`'s relative
-  `-Case` and exit-1 usage errors (`20-run-trials.ps1` already does both
-  right, like `10-make-case.ps1`). Also from grader-01d
-  (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` § Deferred
-  item 2): `test_line_endings.py` could fail on control characters in
-  tracked text files, which the gate missed once. grader-01d moved one
-  of the plan's anchors: `grade.py`'s `check_fair_play` call is now at
-  :406, not :369, so a re-draft (or the overseer's preflight) picks that
-  up. To fold these in, re-draft it first
-  with `/zmh-producer:backlog-plan-gen` (recommended); otherwise they
-  need a later plan.
-
-  **Plan ready (2026-10-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
 - **Isolated trial environment** — a container/WSL distro holding only
   `prompt.md` + `inputs/`, its own Python + Playwright + Claude Code and
   settings (permissions, no MCP servers); WSL needs `[automount]
