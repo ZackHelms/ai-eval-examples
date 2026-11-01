@@ -1,0 +1,7 @@
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["locator-role"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The Previous « Network check asks for a button, but the element is a link (line 20)."
+fails_at = 20
+target   = "https://playwright.dev"
