@@ -517,3 +517,89 @@ def test_console_output_has_a_line_per_trial_and_a_summary(tmp_path: Path) -> No
     assert "summary: invalid 1, pass 1" in text
     assert f"replays run: {result.replay_count}" in text
     assert str(world.trials_path) in text
+
+
+# -- subject sidecars --------------------------------------------------------
+
+
+def write_subject_sidecar(world: World, run: int, content: object) -> Path:
+    """Write ``<NN>-run<N>.subject.json`` beside a run; ``content`` is a JSON value or raw text."""
+    path = world.trials_root / f"01-run{run}.subject.json"
+    text = content if isinstance(content, str) else json.dumps(content)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_sidecar_overrides_the_subject_arguments(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    world.add_good_trial(1, REFERENCE)
+    write_subject_sidecar(
+        world, 1, {"model": "ignored-model", "effort": "low", "context": "claude-md", "tools": "interactive"}
+    )
+    assert only(world.grade([1], effort="high", context="none", tools="edit-only")).verdict == "pass"
+    (rec,) = world.records()
+    # The model still comes from the transcript, never from the sidecar.
+    assert rec["subject"] == {
+        "model": "model-a",
+        "effort": "low",
+        "context": "claude-md",
+        "tools": "interactive",
+        "cli": "9.9.9",
+    }
+    assert list(rec["subject"]) == ["model", "effort", "context", "tools", "cli"]
+
+
+def test_without_a_sidecar_the_arguments_are_recorded(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    world.add_good_trial(1, REFERENCE)
+    world.grade([1], effort="high", context="ctx", tools="interactive")
+    (rec,) = world.records()
+    assert rec["subject"] == {
+        "model": "model-a",
+        "effort": "high",
+        "context": "ctx",
+        "tools": "interactive",
+        "cli": "9.9.9",
+    }
+
+
+def test_each_run_in_a_batch_records_its_own_subject(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    world.add_good_trial(1, REFERENCE)
+    world.add_good_trial(2, REFERENCE)
+    write_subject_sidecar(world, 2, {"effort": "low", "context": "c2", "tools": "t2"})
+    world.grade([1, 2], effort="high", context="c1", tools="t1")
+    by_run = {rec["run"]: rec["subject"] for rec in world.records()}
+    assert (by_run[1]["effort"], by_run[1]["context"], by_run[1]["tools"]) == ("high", "c1", "t1")
+    assert (by_run[2]["effort"], by_run[2]["context"], by_run[2]["tools"]) == ("low", "c2", "t2")
+
+
+def test_a_corrupt_sidecar_makes_the_run_invalid(tmp_path: Path) -> None:
+    cases = {
+        "bad-json": "{not json",
+        "not-an-object": '["effort", "context", "tools"]',
+        "missing-key": {"effort": "low", "context": "none"},
+        "non-string": {"effort": "low", "context": "none", "tools": 3},
+    }
+    for label, content in cases.items():
+        world = World(tmp_path / label)
+        world.add_good_trial(1, REFERENCE)
+        path = write_subject_sidecar(world, 1, content)
+        outcome = only(world.grade([1], effort="high"))
+        assert (outcome.verdict, outcome.tags) == ("invalid", ("harness-error",)), label
+        assert "unreadable subject sidecar" in outcome.detail, label
+        assert str(path) in outcome.detail, label
+        assert world.trial_replays() == [], label
+        (rec,) = world.records()
+        assert (rec["verdict"], rec["tags"]) == ("invalid", ["harness-error"]), label
+        assert rec["subject"]["effort"] == "high", label  # the arguments stand in
+
+
+def test_a_sidecar_that_is_not_utf8_makes_the_run_invalid(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    world.add_good_trial(1, REFERENCE)
+    path = world.trials_root / "01-run1.subject.json"
+    path.write_bytes(b"\xff\xfe\x00{")
+    outcome = only(world.grade([1]))
+    assert (outcome.verdict, outcome.tags) == ("invalid", ("harness-error",))
+    assert str(path) in outcome.detail

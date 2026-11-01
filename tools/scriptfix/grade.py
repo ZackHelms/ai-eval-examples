@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import ast
 import datetime
+import json
 import os
 import re
 import sys
@@ -122,6 +123,7 @@ class TrialFiles:
     folder: Path
     script: Path
     stream_log: Path
+    subject_file: Path
     sessions_dir: Path
     transcript: Path | None  # None when neither source has one
 
@@ -133,7 +135,9 @@ def locate_trial(case_number: str, run: int, trials_root: Path, projects_root: P
     transcript is ``<trials_root>/<NN>-run<N>.stream.jsonl`` if that exists,
     else the newest ``*.jsonl`` directly inside
     ``<projects_root>/<mangled folder path>/`` (the directory also holds
-    same-named subdirectories, so it isn't searched recursively).
+    same-named subdirectories, so it isn't searched recursively). The
+    subject sidecar, when the trial runner wrote one, is
+    ``<trials_root>/<NN>-run<N>.subject.json``.
     """
     name = f"{case_number}-run{run}"
     folder = Path(os.path.abspath(Path(trials_root) / name))
@@ -151,6 +155,7 @@ def locate_trial(case_number: str, run: int, trials_root: Path, projects_root: P
         folder=folder,
         script=folder / "inputs" / "script.py",
         stream_log=stream_log,
+        subject_file=Path(trials_root) / f"{name}.subject.json",
         sessions_dir=sessions_dir,
         transcript=transcript,
     )
@@ -282,6 +287,9 @@ class TrialOutcome:
     cli: str | None = None
     session: str | None = None
     cost_usd: float | None = None
+    # The (effort, context, tools) a valid sidecar recorded; None means the
+    # grade() arguments apply.
+    subject: tuple[str, str, str] | None = None
 
 
 @dataclass
@@ -290,6 +298,7 @@ class _Loaded:
 
     data: bytes | None = None
     transcript: Transcript | None = None
+    subject: tuple[str, str, str] | None = None
     problems: list[str] = field(default_factory=list)
 
 
@@ -308,7 +317,34 @@ def _load(files: TrialFiles) -> _Loaded:
             loaded.transcript = read_transcript(files.transcript)
         except (OSError, ValueError) as exc:
             loaded.problems.append(f"unreadable transcript {files.transcript}: {exc}")
+    if files.subject_file.is_file():
+        try:
+            loaded.subject = _read_subject(files.subject_file)
+        except (OSError, ValueError) as exc:
+            loaded.problems.append(f"unreadable subject sidecar {files.subject_file}: {exc}")
     return loaded
+
+
+_SUBJECT_KEYS = ("effort", "context", "tools")
+
+
+def _read_subject(path: Path) -> tuple[str, str, str]:
+    """The (effort, context, tools) strings in a subject sidecar.
+
+    Raises ``ValueError`` (or ``OSError``) when the file can't be read, isn't
+    a JSON object, or lacks one of the three keys as a string. Other keys,
+    ``model`` included, are ignored: the model always comes from the transcript.
+    """
+    try:
+        data = json.loads(path.read_bytes().decode("utf-8"))
+    except ValueError as exc:  # JSONDecodeError and UnicodeDecodeError are both ValueErrors
+        raise ValueError(f"not valid JSON ({exc})") from exc
+    if not isinstance(data, dict):
+        raise ValueError("not a JSON object")
+    for key in _SUBJECT_KEYS:
+        if not isinstance(data.get(key), str):
+            raise ValueError(f"'{key}' is missing or not a string")
+    return data["effort"], data["context"], data["tools"]
 
 
 def _base(files: TrialFiles, loaded: _Loaded) -> TrialOutcome:
@@ -324,6 +360,7 @@ def _base(files: TrialFiles, loaded: _Loaded) -> TrialOutcome:
         cli=t.cli_version if t else None,
         session=t.session_id if t else None,
         cost_usd=t.cost_usd if t else None,
+        subject=loaded.subject,
     )
 
 
@@ -470,6 +507,15 @@ def _trial_line(outcome: TrialOutcome) -> str:
     return "  ".join(parts)
 
 
+def _subject_record(item: TrialOutcome, defaults: tuple[str, str, str]) -> dict[str, object]:
+    """The ``subject`` field: the run's sidecar values, else the ``grade`` arguments.
+
+    The model and CLI version always come from the transcript.
+    """
+    effort, context, tools = item.subject or defaults
+    return {"model": item.model, "effort": effort, "context": context, "tools": tools, "cli": item.cli}
+
+
 def grade(
     case_dir: Path,
     runs: list[int],
@@ -556,13 +602,7 @@ def grade(
                 date=when,
                 rubric=RUBRIC,
                 grader=__version__,
-                subject={
-                    "model": item.model,
-                    "effort": effort,
-                    "context": context,
-                    "tools": tools,
-                    "cli": item.cli,
-                },
+                subject=_subject_record(item, (effort, context, tools)),
                 verdict=item.verdict,
                 tags=item.tags,
                 fix=item.fix,

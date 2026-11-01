@@ -90,9 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Claude Code projects folder to find session transcripts (default: ~/.claude/projects)",
     )
-    grader.add_argument("--effort", default="default", help="subject effort to record (default: default)")
-    grader.add_argument("--context", default="none", help="subject context files to record (default: none)")
-    grader.add_argument("--tools", default="edit-only", help="subject tool profile to record (default: edit-only)")
+    grader.add_argument("--effort", default="default", help="subject effort to record for runs without a <NN>-run<N>.subject.json sidecar (default: default)")
+    grader.add_argument("--context", default="none", help="subject context files to record for runs without a <NN>-run<N>.subject.json sidecar (default: none)")
+    grader.add_argument("--tools", default="edit-only", help="subject tool profile to record for runs without a <NN>-run<N>.subject.json sidecar (default: edit-only)")
     grader.add_argument("--timeout", type=int, default=120, help="seconds before a replay is killed (default: 120)")
 
     reporter = sub.add_parser(

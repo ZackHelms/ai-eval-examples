@@ -40,13 +40,13 @@
     default applies).
 
 .PARAMETER Effort
-    Subject effort to record.
+    Subject effort to record for runs without a <NN>-run<N>.subject.json sidecar.
 
 .PARAMETER Context
-    Subject context files to record.
+    Subject context files to record for runs without a <NN>-run<N>.subject.json sidecar.
 
 .PARAMETER Tools
-    Subject tool profile to record, e.g. interactive.
+    Subject tool profile to record for runs without a <NN>-run<N>.subject.json sidecar, e.g. interactive.
 
 .PARAMETER Timeout
     Seconds before a replay is killed.
