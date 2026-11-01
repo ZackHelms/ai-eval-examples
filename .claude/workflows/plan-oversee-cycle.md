@@ -80,6 +80,29 @@ Learned on privnames-01's run (2026-10-31):
   Spawn prompts never contain the names, only the instruction to run the
   check (`.claude\scripts\check-private-names.ps1 -Message '<message>'`).
 
+Learned on grader-01c's run (2026-11-01):
+
+- **A new agent type can't be spawned in the session that adds it.**
+  Agent definitions load at session start. Spawn a general-purpose agent
+  told to read the new `.claude/agents/<name>.md` and follow it; the
+  static pre-pass on cases 02–06 ran that way.
+- **Commit with one `-m` here-string.** `git commit -F -` gets no stdin in
+  these shells. Several `-m` options make separate paragraphs, which
+  splits the trailer block, and git then reads only the last trailer.
+  Spawn prompts say: one `-m` with a single-quoted here-string, the two
+  trailer lines adjacent as the last paragraph. Check with
+  `git log -1 --format=%B | git interpret-trailers --parse`.
+- **The worktree guard refuses Bash commands that name paths outside the
+  worktree**, `$TEMP` included. Write temp scripts with the Write tool and
+  run them from PowerShell.
+- **A done-check that greps for replaced text must name its files.** The
+  plan quotes the text it replaces (and TODO.md checklists may too), so a
+  repo-wide `git grep` never comes up empty.
+- **Hidden breaks stay out of run docs too.** For cases whose breaks are
+  hidden, commit messages, follow-ups and DONE.md say what was added,
+  never the break: the history and `.claude/` are readable on the trial
+  host.
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task
