@@ -37,6 +37,20 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   this session ran its checks by hand each time (answer leaks in
   `prompt.md`/`inputs/`, placeholders, LF endings, the generic-content
   pin). Approve a `.claude/agents/` reviewer with that checklist?
+- **AGENT-OPP: grader red-team** (refine pass after grader-01b,
+  2026-10-31). The proposed agent writes fake-fix variants of a case's
+  reference meant to slip past `tools/scriptfix`, e.g.:
+  - a sleep under an import alias;
+  - a timeout passed through `**opts`;
+  - a conditional re-raise;
+  - a step hidden in a ternary.
+
+  It runs `check_static` on each, and proposes a labeled corpus file for
+  any variant the grader misses. In grader-01b's review, 4 of the 5
+  sonnet-tier code tasks had a hole like this that only the overseer's
+  review caught, and a false pass rewards cheating contexts. It pairs
+  with § Next "Grader hardening". Approve a `.claude/agents/` role with
+  this checklist?
 - **Test-site element inventory: hands-on pass** (the CD's request,
   2026-10-31): the first pass is `.claude/notes/test-site-element-inventory.md`,
   generic by rule (CLAUDE.md § Project pins: generic content only). The
@@ -116,8 +130,8 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
         multi-user approach / local target / codegen workflow (Tech
         stack). Done: trial-run loop + Playtest SOP, `skills/` list,
         file contract for script-fix cases (ADR-0001)
-  - [ ] `.claude/zmh/producer.md` — Environment setup quirks (venv
-        activation)
+  - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
+        venv bootstrap; refine pass after grader-01b)
   - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
         remaining Playwright/Locust API pins (waits + transaction timers
         done)

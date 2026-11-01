@@ -15,6 +15,9 @@ the grading material it must not see: a reference fix and rubric
   - On Windows: `winget install Python.Python.3.12`
 - `.\01-setup-env.ps1 --help` to see what it does before running it
 - `.\01-setup-env.ps1`
+- `.\.venv\Scripts\python.exe -m pytest` runs the tests (the project gate)
+- `.\30-grade-trials.ps1 -h` grades saved trials of a script-fix eval and
+  reports pass rates
 
 
 ## Record, Replay, Create Eval

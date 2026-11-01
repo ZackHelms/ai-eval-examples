@@ -3,7 +3,10 @@
 ## Environment
 - Shell: pwsh (PowerShell 7)
 - Working tree: `D:\gitrepos\ai-eval-examples`
-- Setup quirks: <FILL-IN: e.g. "activate the repo venv first (`.venv\Scripts\Activate.ps1`)" once the first-eval level-set pins it | none>
+- Setup quirks: run `.\01-setup-env.ps1` in a fresh oversee worktree before
+  the gate. It builds that worktree's own `.venv` from `requirements.txt`;
+  the Playwright browsers are shared per user. The gate calls
+  `.\.venv\Scripts\python.exe` directly, so no activation is needed.
 
 ## Backlog (TODO.md)
 - Buckets, in file order: In progress · Now · Needs Zack · Next · Later ·

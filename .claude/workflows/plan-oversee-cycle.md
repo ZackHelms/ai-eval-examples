@@ -52,6 +52,25 @@ either via two sessions or one session with `/model` switches.
 5. **Loop.** Go to step 2 for the recommended next plan, a new feature, a
    bugfix, or "what should we work on next".
 
+## Gotchas (this repo)
+
+Learned on grader-01b's run (2026-10-31):
+
+- **A fresh worktree has no `.venv`.** Run `.\01-setup-env.ps1` in it
+  first. It builds that worktree's own venv from `requirements.txt` in
+  about a minute; the Playwright browsers are shared per user. After the
+  merge, run the script again in the primary checkout if
+  `requirements.txt` changed, before its gate run.
+- **Worktree isolation refuses compound git commands.** It refuses `for`
+  loops, `cd x && git …` and `$(git …)` inside a worktree-isolated
+  session. Run git as plain, separate commands, and say so in every spawn
+  prompt: implementers hit it too.
+- **Integrate from the primary checkout.** Git on the primary checkout is
+  refused while the session is in the worktree. Call `ExitWorktree` with
+  `keep`, merge and push from the primary checkout, then clean up with
+  `git worktree remove .claude/worktrees/<name>` and `git branch -d
+  <branch>`.
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task

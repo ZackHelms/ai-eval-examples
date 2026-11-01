@@ -2,6 +2,13 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-10-31** — Refine pass after grader-01b:
+  - a new skill, `.claude/skills/scriptfix-grader.md` (how the grader
+    decides, and how to extend it);
+  - an LF line-endings test in the pytest gate;
+  - the oversee worktree gotchas, in `plan-oversee-cycle.md`;
+  - the producer config's setup quirk filled in;
+  - an AGENT-OPP stub for a grader red-team.
 - **2026-10-31** — grader-01 phase B, the deterministic grader (oversee
   run of `.claude/plans/DONE/grader-01b.deterministic-grader.md`):
   - `tools/scriptfix/` (standard library only) grades script-fix trials

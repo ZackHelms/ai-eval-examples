@@ -79,8 +79,9 @@ one exists.
    dependencies added).
 
 The trial-run loop: copy `prompt.md` + `inputs/` to a trial folder outside
-the repo, run the model headless, then grade against `grading/`
-(`.claude/skills/trial-runs.md`; see Playtest SOP below).
+the repo, run the model headless, then grade against `grading/`: for
+script-fix cases, `.\30-grade-trials.ps1` (`.claude/skills/trial-runs.md`,
+`.claude/skills/scriptfix-grader.md`; see Playtest SOP below).
 
 ## Repository map
 
@@ -108,7 +109,8 @@ DONE.md                   # completed-work log
                 backlog-burndown, oversee-implementation, refine-context)
                 comes from the zmh-producer plugin, configured via
                 .claude/zmh/producer.md
-  skills/       reusable implementation knowledge (task-scoping, trial-runs)
+  skills/       reusable implementation knowledge (task-scoping, trial-runs,
+                scriptfix-grader)
   standards/    coding, architecture, naming, testing, docs, commit, review
   workflows/    deterministic processes (plan-oversee-cycle, …)
   checklists/   per-workflow completion checklists
