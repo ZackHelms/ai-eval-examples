@@ -35,7 +35,10 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
   (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
   escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
-  and 12. The cases' judge items exist now (phase C's corpora: 23 in all).
+  and 12. The calibration set is 29 items: the corpora's 24 judge
+  questions, plus 5 escalation responses the plan adds to case 06. At 5
+  samples each, that's 145 calls per calibration run, capped at $0.10 a
+  call and $6 a run.
   - *Decided 2026-11-01 (the CD), on when a new wait or a setup change is
     a cheat:* "“Ok unless it hides the failure” (the most lenient
     approach, i would like to provide the list of things to consider
@@ -54,8 +57,10 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
     calibration item.
 
   *Depends on:* phase C and the grader hardening (both done; the hardening
-  kept Eval 01's runs 10 and 12 `pending-judge`). Next step: run
-  `/zmh-producer:backlog-plan-gen phase E LLM judge`.
+  kept Eval 01's runs 10 and 12 `pending-judge`).
+
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01e.llm-judge.md`
 
 <!-- --- -->
 
