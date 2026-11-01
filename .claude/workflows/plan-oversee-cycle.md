@@ -117,6 +117,28 @@ Learned on grader-01d's run (2026-11-01):
   launcher self-test) was a single command; the overseer ran it and read
   the log, which saved a spawn.
 
+Learned on grader-01bb's run (2026-11-01):
+
+- **The guard reads "git" anywhere in a compound Bash command.** A pipe or
+  `;` plus a path holding the letters, such as the session's
+  `…\projects\D--gitrepos-…` results folder, is refused even when no git
+  runs. Read such files with the Grep/Read tools, or run the command from
+  PowerShell.
+- **Re-check grader verdicts after every grader task, not only at the
+  end.** Run the case's committed fixes through `check_static` twice: once
+  with `PYTHONPATH` on the worktree's `tools`, once on the primary
+  checkout's (the pre-run grader). Any difference is a changed verdict,
+  found while the task's context is warm. The plan's fake-`replay_fn`
+  calibration then confirms it end to end.
+- **A test that pins the gap a plan closes.** "No existing test changes its
+  expectation" collides with a test asserting the old behavior the plan
+  replaces. The plan supersedes it: delete it when a new test pins the
+  shape that survives, and log the call. Plan drafters can name such tests
+  up front.
+- **Route a red-team report by collector, and split a task that grows.**
+  The routed misses doubled task 5, so it ran as two spawns (timeouts,
+  detector tables), each one commit.
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task

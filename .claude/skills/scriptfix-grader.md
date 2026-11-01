@@ -4,9 +4,12 @@ How `tools/scriptfix` grades script-fix trials, the rules that aren't
 obvious from the rubric, and how to extend it.
 - **Semantics:** `rubrics/script-fix/rubric-v0.md` is authoritative.
 - **Spec and history:** `.claude/plans/DONE/grader-01b.deterministic-grader.md`.
-- **Decisions and known gaps:** its `.follow-up.md`.
+- **Decisions and known gaps:** its `.follow-up.md`, then
+  `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` (the red-team
+  misses still open).
 
-The grader landed in grader-01b, 2026-10-31.
+The grader landed in grader-01b, 2026-10-31, and was hardened in
+grader-01bb, 2026-11-01.
 
 ## Run it
 

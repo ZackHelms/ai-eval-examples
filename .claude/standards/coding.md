@@ -44,6 +44,10 @@ Python/Playwright fixtures, pwsh repo scripts.
   captured result: pwsh re-decodes the bytes through the console code page
   and breaks UTF-8 (`»`). Run it unpiped and keep `$LASTEXITCODE` in a
   `$script:` variable.
+- **List parameters under `pwsh -File`:** `-Case a,b` reaches a
+  `[string[]]` parameter as the one string `"a,b"` (an interactive call
+  passes an array), so a script that takes a list splits on commas itself
+  (`30-grade-trials.ps1`). Test both call forms.
 - **Exit-code contracts:** under `pwsh -File`, an uncaught `throw` exits 1.
   A script whose codes carry meaning (1 = hit, 2 = usage) catches its own
   errors and calls `exit <n>`, even for unknown arguments
