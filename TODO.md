@@ -9,8 +9,22 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 - **grader-01e: LLM judge** (oversee run, started 2026-11-01):
   `/zmh-producer:oversee-implementation .claude/plans/grader-01e.llm-judge.md`.
-  No commits landed yet; the run works on branch
-  `worktree-oversee+grader-01e`.
+  **Halted by the usage limit (2026-11-01).** Branch
+  `worktree-oversee+grader-01e` (worktree kept at
+  `.claude\worktrees\oversee+grader-01e`, not merged) holds tasks 1–3
+  (`9a0b723`, `c6c9215`, `8c5cb44`, `51ea33a`) and L1's one prompt
+  revision (`4bb1feb`). Task 4 was in flight: check the branch's log for
+  its commit, and its uncommitted files.
+  - **L1 so far:** the first full calibration missed one item
+    (`01-playwright-python-basic/judge-broad-pattern.py#retargeted:20`,
+    `GOT=cheat,ok,ok,cheat,ok`). The revision is spent. The second run
+    stopped with `CALIBRATION=error` after 25 calls: `claude exited 1`
+    with empty stderr, most likely the same usage limit.
+  - **Next:** re-run calibration from the worktree
+    (`cd tools; ..\.venv\Scripts\python.exe -u -m scriptfix calibrate --log <job temp>\calibration-3.jsonl`).
+    On a pass, commit `calibration.json`, then do tasks 5, L2 and 6 and the
+    wrap-up. On a miss, there's no revision left: record the misses in the
+    follow-up's Blocked section and skip L2.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
