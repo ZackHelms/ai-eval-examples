@@ -1,10 +1,12 @@
-"""Command line: ``python -m scriptfix grade ...``, ``calibrate``, ``report``, ``make-case`` and ``run``.
+"""Command line: ``python -m scriptfix grade ...``, ``judge``, ``calibrate``, ``report``, ``make-case`` and ``run``.
 
-Wiring only: argument parsing here, the work in ``grade.py``, ``calibrate.py``,
-``report.py``, ``makecase.py`` and ``run.py``. Exit codes: 0 success, 1 a
-control replay was surprising (the batch is void), a make-case capture was
-(nothing written), a trial run hit a harness problem (or the self-test
-failed) or a calibration missed, erred or ran out of budget, 2 usage errors.
+Wiring only: argument parsing here, the work in ``grade.py``, ``judge.py``,
+``calibrate.py``, ``report.py``, ``makecase.py`` and ``run.py``. Exit codes:
+0 success, 1 a control replay was surprising (the batch is void), a
+make-case capture was (nothing written), a trial run hit a harness problem
+(or the self-test failed), a judged trial erred, the judge is not
+calibrated, or a calibration missed, erred or ran out of budget, 2 usage
+errors (a bad ``reviews.toml`` included).
 """
 
 from __future__ import annotations
@@ -17,7 +19,8 @@ from pathlib import Path
 from scriptfix import RUBRIC, __version__
 from scriptfix.calibrate import CALIBRATION_SAMPLES, DEFAULT_MAX_TOTAL_USD, calibrate
 from scriptfix.grade import grade, parse_runs
-from scriptfix.judgeprompt import JUDGE_DIR, ask_claude
+from scriptfix.judge import NotCalibrated, judge_trials
+from scriptfix.judgeprompt import JUDGE_DIR, Answer, AskFn, ask_claude
 from scriptfix.makecase import make_case
 from scriptfix.report import REPO_ROOT, report
 from scriptfix.run import (
@@ -58,16 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
         prog=PROG,
         description=(
             f"Deterministic grader for rubric {RUBRIC} (grader {__version__}): "
-            "grade saved trials of a script-fix case and report pass rates. "
-            "Everything except the LLM judge."
+            "grade saved trials of a script-fix case, judge what the static checks "
+            "leave to the LLM judge, and report pass rates."
         ),
         epilog=(
             "Exit codes: 0 ok, 1 a control replay or a make-case capture was "
             "surprising, a trial run hit a harness problem (or the self-test "
-            "failed) or a calibration did not pass, 2 usage error."
+            "failed), a judged trial erred or the judge is not calibrated, or a "
+            "calibration did not pass, 2 usage error."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{grade,calibrate,report,make-case,run}", required=True)
+    sub = parser.add_subparsers(dest="command", metavar="{grade,judge,calibrate,report,make-case,run}", required=True)
 
     grader = sub.add_parser(
         "grade",
@@ -98,6 +102,43 @@ def build_parser() -> argparse.ArgumentParser:
     grader.add_argument("--context", default="none", help="subject context files to record for runs without a <NN>-run<N>.subject.json sidecar (default: none)")
     grader.add_argument("--tools", default="edit-only", help="subject tool profile to record for runs without a <NN>-run<N>.subject.json sidecar (default: edit-only)")
     grader.add_argument("--timeout", type=int, default=120, help="seconds before a replay is killed (default: 120)")
+
+    judger = sub.add_parser(
+        "judge",
+        help="ask the LLM judge about one case's pending-judge and needs-review trials",
+        description=(
+            "Judge one case's pending-judge and needs-review trials: one question per judge "
+            "flag (plus the escalation question on an escalate case), each answered by the CD's "
+            "grading/reviews.toml, else the grading/judge.jsonl cache, else one claude -p call "
+            "(a paid Sonnet call, appended to the cache at once). Any cheat makes the trial a "
+            "fail, else any unsure makes it needs-review, else it passes. No retries: a re-run "
+            "resumes from the cache. Refuses to ask while the recorded calibration doesn't match "
+            "the judge. Never replays a script; a record whose judge flags no longer match a "
+            "fresh static check is stale and left alone."
+        ),
+        epilog=(
+            "Prints run N: <verdict> [<tags>] per trial and one line per question, then "
+            "JUDGED= ASKED= CACHED= REVIEWED= ERRORS= COST_USD= (with --dry-run, ASK=<n>). "
+            "Exit codes: 0 done or nothing to judge, 1 a trial erred or the judge is not "
+            "calibrated, 2 usage error (a bad reviews.toml, or no claude when one is needed)."
+        ),
+    )
+    judger.add_argument("--case", required=True, type=Path, help="the eval directory, e.g. evals/01-playwright-python-basic")
+    judger.add_argument("--runs", type=_runs_arg, default=None, help="runs to judge: 1-12 or 1,3,5-7 (default: every pending-judge or needs-review run)")
+    judger.add_argument(
+        "--trials-root",
+        type=Path,
+        default=None,
+        help="folder holding the trials' stream logs, for escalate cases' responses (default: ~/eval-trials)",
+    )
+    judger.add_argument(
+        "--projects-root",
+        type=Path,
+        default=None,
+        help="Claude Code projects folder to find session transcripts (default: ~/.claude/projects)",
+    )
+    judger.add_argument("--claude", type=Path, default=None, help="the claude executable (default: claude on PATH; looked up only when a question is asked)")
+    judger.add_argument("--dry-run", action="store_true", help="list each trial's questions and how many would be asked; ask nothing, write nothing, skip the calibration check")
 
     calibrator = sub.add_parser(
         "calibrate",
@@ -135,8 +176,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="print pass rates per case and subject",
         description=(
             "Print, per case and subject (model, effort, context, tools): passes/valid, "
-            "rate, the 95% lower bound, pending and invalid counts and the most common "
-            "tags. Pending-judge trials are left out of passes/valid until judged."
+            "rate, the 95% lower bound, pending, review and invalid counts and the most "
+            "common tags. Pending-judge trials are left out of passes/valid until judged, "
+            "and needs-review trials until the CD decides."
         ),
     )
     reporter.add_argument(
@@ -309,6 +351,44 @@ def _calibrate_command(parser: argparse.ArgumentParser, args: argparse.Namespace
         return 2  # parser.error exits; keeps the return type honest
 
 
+def _judge_ask(claude: Path | None) -> AskFn:
+    """The real ask function. ``claude`` is resolved on the first question, so a dry run never needs it.
+
+    A missing ``claude`` raises ``ValueError`` then, a usage error.
+    """
+    claude_cmd: list[str] = []
+
+    def ask(prompt: str) -> Answer:
+        if not claude_cmd:
+            claude_cmd.append(str(resolve_claude(claude)))
+        return ask_claude(prompt, claude_cmd=claude_cmd)
+
+    return ask
+
+
+def _judge_command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """The ``judge`` subcommand: validate the arguments, then judge (or dry-run)."""
+    if not args.case.is_dir():
+        parser.error(f"--case is not a directory: {args.case}")
+    try:
+        result = judge_trials(
+            args.case,
+            args.runs,
+            ask_fn=_judge_ask(args.claude),
+            trials_root=args.trials_root,
+            projects_root=args.projects_root,
+            judge_dir=JUDGE_DIR,
+            dry_run=args.dry_run,
+        )
+    except NotCalibrated as exc:
+        print(f"{PROG} judge: {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:  # a bad case.toml, trials.jsonl, judge.jsonl or reviews.toml; no claude
+        parser.error(str(exc))
+        return 2  # parser.error exits; keeps the return type honest
+    return result.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the command line; returns the process exit code."""
     # The console may not be UTF-8 and the output can contain characters like
@@ -361,6 +441,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _run_command(parser, args)
+
+    if args.command == "judge":
+        return _judge_command(parser, args)
 
     if args.command == "calibrate":
         return _calibrate_command(parser, args)
