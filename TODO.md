@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **privnames-01: private-names check script** — oversee run of
-  `.claude/plans/privnames-01.check-script.md`, started 2026-10-31 by
-  `/zmh-producer:oversee-implementation .claude/plans/privnames-01.check-script.md`
-  on branch `worktree-oversee+privnames-01`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -114,16 +111,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
   **Plan ready (2026-10-31)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
-- **Private-names check script** (refine pass, 2026-10-31):
-  `.claude/scripts/check-private-names.ps1` scans the staged diff and the
-  commit message (or, with `-All`, every tracked file and the whole
-  history) against a local, untracked list of names
-  (`.claude/*.local.*`, gitignored). It replaces the hand greps run before
-  each commit since the 2026-10-30 leak, and works from oversee worktrees
-  by reading the list from the main checkout. Per the Script SOP.
-
-  **Plan ready (2026-10-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/privnames-01.check-script.md`
 - **Isolated trial environment** — a container/WSL distro holding only
   `prompt.md` + `inputs/`, its own Python + Playwright + Claude Code and
   settings (permissions, no MCP servers); WSL needs `[automount]
@@ -154,8 +141,8 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
         agents
   - [ ] `.claude/checklists/README.md` — per-workflow checklists (as
         workflows grow)
-  - [ ] `.claude/skills/task-scoping.md` — per-tier failure modes (grows
-        from the oversee ledger)
+  - [x] `.claude/skills/task-scoping.md` — per-tier failure modes (seeded
+        2026-10-31, privnames-01; keeps growing from the oversee ledger)
 - **SDK trial harness** — run trials unattended with the Claude Agent SDK:
   pick model + effort + tools, log or deny every tool call before it runs,
   save the full transcript, hand the result to the grader-01 grader.

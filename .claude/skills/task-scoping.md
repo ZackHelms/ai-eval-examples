@@ -94,14 +94,14 @@ If any item fails: decompose (below) or start at sonnet.
 
 ## Known per-tier failure modes (ledger-fed)
 
-<FILL-IN: repo-specific tier examples and circuit-breakers — grow from this
-repo's oversee ledger. Seed with the two universal ones every originating
-studio observed before any local ledger rows exist:
-- **haiku:** drifts from unstated repo conventions (name an example file);
-  over-literal (checklist item 5); may report success without running the
-  validation procedure — the spawn prompt must require pasting its output.
-- **sonnet-medium:** fine for docs/tests; on code it under-explores callers.
-Promote a rule here only after **2+ ledger observations**; cite the dates.>
+Promote a rule here only after **2+ ledger observations**; cite the dates.
+- **haiku** (seed): drifts from unstated conventions (name an example file);
+  over-literal (item 5); may skip the gate — require its pasted output.
+- **sonnet-medium** (seed): fine for docs/tests; on code it under-explores callers.
+- **sonnet, pwsh scripts** (2026-10-31 ×2: grader-01b #8, privnames-01 #1):
+  passes the listed checks but misses a scope trap none covered
+  (`$PSBoundParameters` in `& {}`, cwd-scoped `git grep`). Keep sonnet (one
+  warm retry fixed each); plans add a run-from-a-subfolder, every-option check.
 
 ## Circuit breaker
 

@@ -44,6 +44,14 @@ Python/Playwright fixtures, pwsh repo scripts.
   captured result: pwsh re-decodes the bytes through the console code page
   and breaks UTF-8 (`»`). Run it unpiped and keep `$LASTEXITCODE` in a
   `$script:` variable.
+- **Exit-code contracts:** under `pwsh -File`, an uncaught `throw` exits 1.
+  A script whose codes carry meaning (1 = hit, 2 = usage) catches its own
+  errors and calls `exit <n>`, even for unknown arguments
+  (`check-private-names.ps1`).
+- **Repo-wide git calls:** `git grep` and `git ls-files` cover only the
+  current subdirectory and print paths relative to it. Resolve
+  `git rev-parse --show-toplevel` once, then run every later call as
+  `git -C <toplevel> …`.
 
 ## Platform pins (the static reviewer flags these)
 
