@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import datetime
 import json
+import sys
+import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
 
-from scriptfix.makecase import Edit, Recipe, build_scripts, load_recipe
+from scriptfix import makecase
+from scriptfix.makecase import Edit, Recipe, build_scripts, load_recipe, make_case, probe_versions
+from scriptfix.replay import ReplayResult
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVAL_01_REFERENCE = REPO_ROOT / "evals" / "01-playwright-python-basic" / "grading" / "reference" / "script.py"
@@ -456,3 +462,302 @@ def test_case_02_recipe_builds_from_eval_01(tmp_path: Path) -> None:
     assert broken_lines[17] == reference_lines[17].replace("»", ">")
     assert ">" in broken_lines[17]
     assert "»" not in broken_lines[17]
+
+
+# -- make_case: capture with a fake replay -----------------------------------
+
+PYTHON = Path("capture-venv") / "python.exe"  # never run: the probe is patched
+VERSIONS = ("3.12.10", "1.64.1")
+OUTPUT_LF = (
+    b"Traceback (most recent call last):\n"
+    b'  File "script.py", line 18, in <module>\n'
+    b"Error: boom\n"
+)
+CASE_02_TOML = """\
+rubric   = "script-fix-v0"
+expected = "fix"
+issue    = ["locator-text"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The Next link's name has > where the page has » (line 18)."
+fails_at = 18
+target   = "https://playwright.dev"
+"""
+SIX_FILES = [
+    "grading/capture.toml",
+    "grading/reference/script.py",
+    "inputs/results.txt",
+    "inputs/script.pwtrace.zip",
+    "inputs/script.py",
+    "prompt.md",
+]
+
+
+class FakeReplay:
+    """A replay_fn that writes a canned output and trace into the workdir it is given."""
+
+    def __init__(
+        self,
+        *,
+        reference: ReplayResult | None = None,
+        broken: ReplayResult | None = None,
+        output: bytes = OUTPUT_LF,
+        write_output: bool = True,
+        write_trace: bool = True,
+    ) -> None:
+        self.reference = reference or ReplayResult(0, False, None, "ok")
+        self.broken = broken or ReplayResult(1, False, 18, output.decode("utf-8"))
+        self.output = output
+        self.write_output = write_output
+        self.write_trace = write_trace
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
+    def __call__(self, script: Path, **kwargs: object) -> ReplayResult:
+        self.calls.append((script.read_text(encoding="utf-8"), kwargs))
+        workdir = kwargs.get("workdir")
+        if workdir is None:
+            return self.reference
+        assert isinstance(workdir, Path)
+        workdir.mkdir(parents=True, exist_ok=True)
+        if self.write_output:
+            (workdir / "output.txt").write_bytes(self.output)
+        if self.write_trace:
+            with zipfile.ZipFile(workdir / "script.pwtrace.zip", "w") as archive:
+                archive.writestr("trace.trace", "{}")
+        return self.broken
+
+
+TempRepo = tuple[Path, Path, Path]  # (repo_root, case_dir, temp_dir)
+
+
+@pytest.fixture
+def temp_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TempRepo:
+    """A tmp repo holding Eval 01's reference, the shared prompt and case 02-x.
+
+    Also redirects tempfile's temp dir, so nothing touches the real %TEMP%\\pwrun.
+    """
+    repo = tmp_path / "repo"
+    source = repo / "evals" / "01-playwright-python-basic" / "grading" / "reference" / "script.py"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(EVAL_01_REFERENCE.read_bytes())
+    prompt = repo / "rubrics" / "script-fix" / "prompt.md"
+    prompt.parent.mkdir(parents=True)
+    prompt.write_bytes((REPO_ROOT / "rubrics" / "script-fix" / "prompt.md").read_bytes())
+    case_dir = repo / "evals" / "02-x"
+    (case_dir / "grading").mkdir(parents=True)
+    (case_dir / "grading" / "recipe.toml").write_text(CASE_02_RECIPE, encoding="utf-8", newline="\n")
+    (case_dir / "grading" / "case.toml").write_text(CASE_02_TOML, encoding="utf-8", newline="\n")
+    temp_dir = tmp_path / "temp"
+    temp_dir.mkdir()
+    monkeypatch.setattr("tempfile.tempdir", str(temp_dir))
+    monkeypatch.setattr(makecase, "probe_versions", lambda python: VERSIONS)
+    return repo, case_dir, temp_dir
+
+
+def files_under(folder: Path) -> list[str]:
+    return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*"))
+
+
+def run_make_case(temp_repo: TempRepo, fake: FakeReplay) -> tuple[int, list[str]]:
+    repo, case_dir, _ = temp_repo
+    lines: list[str] = []
+    code = make_case(case_dir, repo_root=repo, python=PYTHON, replay_fn=fake, out=lines.append)
+    return code, lines
+
+
+def test_a_good_capture_writes_the_six_files(temp_repo: TempRepo) -> None:
+    repo, case_dir, temp_dir = temp_repo
+    before = files_under(case_dir)
+    fake = FakeReplay()
+    code, lines = run_make_case(temp_repo, fake)
+    assert code == 0
+    written = [f for f in files_under(case_dir) if (case_dir / f).is_file() and f not in before]
+    assert written == SIX_FILES
+    assert [line for line in lines if line.startswith("wrote ")] == [
+        "wrote evals/02-x/grading/reference/script.py",
+        "wrote evals/02-x/inputs/script.py",
+        "wrote evals/02-x/prompt.md",
+        "wrote evals/02-x/inputs/results.txt",
+        "wrote evals/02-x/inputs/script.pwtrace.zip",
+        "wrote evals/02-x/grading/capture.toml",
+    ]
+    reference, broken = build_scripts(load_recipe(case_dir), repo)
+    assert (case_dir / "grading" / "reference" / "script.py").read_bytes() == reference.encode("utf-8")
+    assert (case_dir / "inputs" / "script.py").read_bytes() == broken.encode("utf-8")
+    shared = (repo / "rubrics" / "script-fix" / "prompt.md").read_bytes()
+    assert (case_dir / "prompt.md").read_bytes() == shared
+    # Exactly two replays: the reference in the default workdir, then the input in pwrun.
+    assert len(fake.calls) == 2
+    assert fake.calls[0][0] == reference and "workdir" not in fake.calls[0][1]
+    assert fake.calls[1][0] == broken
+    assert fake.calls[1][1]["workdir"] == temp_dir / "pwrun"
+    assert fake.calls[1][1]["python"] == PYTHON and fake.calls[1][1]["timeout_s"] == 120
+    with zipfile.ZipFile(case_dir / "inputs" / "script.pwtrace.zip") as archive:
+        assert archive.namelist() == ["trace.trace"]
+
+
+def test_results_txt_ends_with_the_exit_code_line_lf(temp_repo: TempRepo) -> None:
+    _, case_dir, _ = temp_repo
+    assert run_make_case(temp_repo, FakeReplay())[0] == 0
+    assert (case_dir / "inputs" / "results.txt").read_bytes() == OUTPUT_LF + b"exit code: 1\n"
+
+
+def test_results_txt_ends_with_the_exit_code_line_crlf(temp_repo: TempRepo) -> None:
+    _, case_dir, _ = temp_repo
+    output = OUTPUT_LF.replace(b"\n", b"\r\n")
+    assert run_make_case(temp_repo, FakeReplay(output=output))[0] == 0
+    assert (case_dir / "inputs" / "results.txt").read_bytes() == output + b"exit code: 1\r\n"
+
+
+def test_results_txt_adds_the_missing_final_line_ending(temp_repo: TempRepo) -> None:
+    _, case_dir, _ = temp_repo
+    output = OUTPUT_LF.replace(b"\n", b"\r\n").rstrip(b"\r\n")
+    assert run_make_case(temp_repo, FakeReplay(output=output))[0] == 0
+    assert (case_dir / "inputs" / "results.txt").read_bytes() == output + b"\r\nexit code: 1\r\n"
+    # An LF output with no final newline gets an LF.
+    assert run_make_case(temp_repo, FakeReplay(output=b"x\ny"))[0] == 0
+    assert (case_dir / "inputs" / "results.txt").read_bytes() == b"x\ny\nexit code: 1\n"
+
+
+def test_capture_toml_round_trips_in_key_order(temp_repo: TempRepo) -> None:
+    _, case_dir, _ = temp_repo
+    assert run_make_case(temp_repo, FakeReplay())[0] == 0
+    raw = (case_dir / "grading" / "capture.toml").read_bytes()
+    assert b"\r" not in raw
+    assert raw.startswith(b"# Written by 10-make-case.ps1 from recipe.toml; regenerate, don't edit.\n")
+    data = tomllib.loads(raw.decode("utf-8"))
+    assert list(data) == [
+        "date",
+        "target",
+        "users",
+        "iterations",
+        "python",
+        "playwright",
+        "reference_exit",
+        "input_exit",
+        "input_failing_line",
+    ]
+    assert data == {
+        "date": datetime.date.today().isoformat(),
+        "target": "https://playwright.dev",
+        "users": 1,
+        "iterations": 1,
+        "python": "3.12.10",
+        "playwright": "1.64.1",
+        "reference_exit": 0,
+        "input_exit": 1,
+        "input_failing_line": 18,
+    }
+
+
+def test_a_second_capture_overwrites_the_first(temp_repo: TempRepo) -> None:
+    _, case_dir, _ = temp_repo
+    assert run_make_case(temp_repo, FakeReplay())[0] == 0
+    assert run_make_case(temp_repo, FakeReplay(output=b"other\n"))[0] == 0
+    assert (case_dir / "inputs" / "results.txt").read_bytes() == b"other\nexit code: 1\n"
+
+
+def probe_fails(python: Path) -> tuple[str, str]:
+    raise RuntimeError("version probe failed: exit 1: no playwright")
+
+
+SURPRISES = [
+    pytest.param({"reference": ReplayResult(None, True, None, "")}, "reference replay failed: timed out", id="reference-timeout"),
+    pytest.param({"reference": ReplayResult(1, False, 7, "x")}, "reference replay failed: exit 1 at line 7", id="reference-fails"),
+    pytest.param({"broken": ReplayResult(None, True, None, "")}, "input replay timed out", id="input-timeout"),
+    pytest.param({"broken": ReplayResult(0, False, None, "")}, "input replay exited 0", id="input-passes"),
+    pytest.param({"broken": ReplayResult(1, False, 19, "x")}, "failed at line 19", id="input-wrong-line"),
+    pytest.param({"broken": ReplayResult(1, False, None, "x")}, "failed at no failing line", id="input-no-line"),
+    pytest.param({"write_output": False}, "left no output.txt", id="no-output"),
+    pytest.param({"write_trace": False}, "left no script.pwtrace.zip", id="no-trace"),
+]
+
+
+@pytest.mark.parametrize(("fake_args", "message"), SURPRISES)
+def test_each_surprise_returns_one_and_writes_nothing(
+    temp_repo: TempRepo, fake_args: dict[str, object], message: str
+) -> None:
+    _, case_dir, temp_dir = temp_repo
+    before = files_under(case_dir)
+    fake = FakeReplay(**fake_args)  # type: ignore[arg-type]
+    code, lines = run_make_case(temp_repo, fake)
+    assert code == 1
+    assert any(message in line for line in lines), lines
+    assert files_under(case_dir) == before
+    assert not (case_dir / "inputs").exists()
+    assert [p.name for p in temp_dir.iterdir()] in ([], ["pwrun"])  # the scratch scripts are gone
+
+
+def test_a_surprising_reference_never_replays_the_input(temp_repo: TempRepo) -> None:
+    fake = FakeReplay(reference=ReplayResult(1, False, 7, "x"))
+    assert run_make_case(temp_repo, fake)[0] == 1
+    assert len(fake.calls) == 1
+
+
+def test_a_failed_version_probe_replays_nothing(temp_repo: TempRepo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _, case_dir, _ = temp_repo
+    monkeypatch.setattr(makecase, "probe_versions", probe_fails)
+    before = files_under(case_dir)
+    fake = FakeReplay()
+    code, lines = run_make_case(temp_repo, fake)
+    assert code == 1
+    assert any("version probe failed" in line for line in lines)
+    assert fake.calls == []
+    assert files_under(case_dir) == before
+
+
+def test_dry_run_prints_the_diff_and_touches_nothing(temp_repo: TempRepo, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, case_dir, temp_dir = temp_repo
+
+    def never(*args: object, **kwargs: object) -> None:
+        raise AssertionError("a dry run must not replay or probe")
+
+    monkeypatch.setattr(makecase, "probe_versions", never)
+    before_case, before_temp = files_under(case_dir), files_under(temp_dir)
+    lines: list[str] = []
+    code = make_case(case_dir, repo_root=repo, python=PYTHON, dry_run=True, replay_fn=never, out=lines.append)
+    assert code == 0
+    assert files_under(case_dir) == before_case
+    assert files_under(temp_dir) == before_temp
+    text = "\n".join(lines)
+    assert "--- grading/reference/script.py" in text and "+++ inputs/script.py" in text
+    changed = [line for line in lines if line[:1] in "+-" and not line.startswith(("---", "+++"))]
+    assert len(changed) == 2
+    assert "would replay the reference" in text
+    assert f"would replay the input in {temp_dir / 'pwrun'}" in text
+
+
+def test_dry_run_still_reports_a_bad_recipe(temp_repo: TempRepo) -> None:
+    repo, case_dir, _ = temp_repo
+    (case_dir / "grading" / "recipe.toml").write_text('source = "evals/nope.py"\n', encoding="utf-8", newline="\n")
+    with pytest.raises(ValueError, match="'source' does not exist"):
+        make_case(case_dir, repo_root=repo, python=PYTHON, dry_run=True, out=lambda line: None)
+
+
+def test_a_bad_case_toml_raises_value_error(temp_repo: TempRepo) -> None:
+    repo, case_dir, _ = temp_repo
+    (case_dir / "grading" / "case.toml").write_text("rubric = 'x'\n", encoding="utf-8", newline="\n")
+    with pytest.raises(ValueError, match="case.toml"):
+        make_case(case_dir, repo_root=repo, python=PYTHON, replay_fn=FakeReplay(), out=lambda line: None)
+
+
+def test_default_replay_fn_is_scriptfix_replay(temp_repo: TempRepo, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, case_dir, _ = temp_repo
+    fake = FakeReplay()
+    monkeypatch.setattr("scriptfix.replay.replay", fake)
+    assert make_case(case_dir, repo_root=repo, python=PYTHON, out=lambda line: None) == 0
+    assert len(fake.calls) == 2
+
+
+def test_probe_versions_gives_the_typed_error_or_two_versions() -> None:
+    # The test venv may or may not have playwright; either way the result is typed.
+    try:
+        python_version, playwright_version = probe_versions(Path(sys.executable))
+    except RuntimeError as error:
+        assert str(error).startswith("version probe failed")
+    else:
+        assert python_version.count(".") == 2 and playwright_version
+
+
+def test_probe_versions_fails_on_a_missing_python(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="version probe failed"):
+        probe_versions(tmp_path / "no-such-python.exe")

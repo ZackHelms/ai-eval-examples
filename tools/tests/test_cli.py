@@ -62,6 +62,8 @@ def test_help_exits_zero_and_lists_the_subcommands(capsys: pytest.CaptureFixture
         ["grade", "--case", "x"],  # --runs is required
         ["grade", "--case", "x", "--runs", "5-3"],
         ["grade", "--case", "x", "--runs", "a"],
+        ["make-case", "--bogus"],
+        ["make-case"],  # --case and --python are required
         [],
     ],
 )
@@ -70,6 +72,57 @@ def test_usage_errors_exit_two_with_a_pointer_to_help(argv: list[str], capsys: p
         cli.main(argv)
     assert exit_info.value.code == 2
     assert "-h" in capsys.readouterr().err
+
+
+def test_make_case_help_lists_its_options(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["make-case", "-h"])
+    assert exit_info.value.code == 0
+    out = capsys.readouterr().out
+    for option in ("--case", "--python", "--timeout", "--dry-run"):
+        assert option in out
+    with pytest.raises(SystemExit):
+        cli.main(["-h"])
+    assert "make-case" in capsys.readouterr().out
+
+
+def test_make_case_usage_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    case = tmp_path / "02-x"
+    case.mkdir()
+    python = tmp_path / "python.exe"
+    for argv in (
+        ["make-case", "--case", str(tmp_path / "nope"), "--python", str(python)],  # no such directory
+        ["make-case", "--case", str(case), "--python", str(python), "--timeout", "0"],
+        ["make-case", "--case", str(case), "--python", str(python)],  # python missing, not a dry run
+        ["make-case", "--case", str(case), "--python", str(python), "--dry-run"],  # no case.toml
+    ):
+        with pytest.raises(SystemExit) as exit_info:
+            cli.main(argv)
+        assert exit_info.value.code == 2
+        assert "-h" in capsys.readouterr().err
+
+
+def test_make_case_wires_the_arguments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_make_case(case_dir: Path, **kwargs: object) -> int:
+        seen["case"] = case_dir
+        seen.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(cli, "make_case", fake_make_case)
+    case = tmp_path / "02-x"
+    case.mkdir()
+    python = tmp_path / "python.exe"
+    python.write_bytes(b"")
+    code = cli.main(["make-case", "--case", str(case), "--python", str(python), "--timeout", "30"])
+    assert code == 1  # make_case's exit code is passed through
+    assert seen["case"] == case and seen["python"] == python
+    assert seen["timeout_s"] == 30 and seen["dry_run"] is False
+    assert seen["repo_root"] == Path(cli.__file__).resolve().parents[2]
+    # --dry-run does not check --python.
+    code = cli.main(["make-case", "--case", str(case), "--python", str(tmp_path / "gone.exe"), "--dry-run"])
+    assert code == 1 and seen["dry_run"] is True
 
 
 def test_missing_case_directory_is_a_usage_error(tmp_path: Path) -> None:
