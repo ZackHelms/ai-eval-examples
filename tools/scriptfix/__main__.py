@@ -1,9 +1,9 @@
-"""Command line: ``python -m scriptfix grade ...``, ``report`` and ``make-case``.
+"""Command line: ``python -m scriptfix grade ...``, ``report``, ``make-case`` and ``run``.
 
-Wiring only: argument parsing here, the work in ``grade.py``, ``report.py``
-and ``makecase.py``. Exit codes: 0 success, 1 a control replay was
-surprising (the batch is void) or a make-case capture was (nothing written),
-2 usage errors.
+Wiring only: argument parsing here, the work in ``grade.py``, ``report.py``,
+``makecase.py`` and ``run.py``. Exit codes: 0 success, 1 a control replay was
+surprising (the batch is void), a make-case capture was (nothing written), or
+a trial run hit a harness problem (or the self-test failed), 2 usage errors.
 """
 
 from __future__ import annotations
@@ -16,6 +16,19 @@ from scriptfix import RUBRIC, __version__
 from scriptfix.grade import grade, parse_runs
 from scriptfix.makecase import make_case
 from scriptfix.report import REPO_ROOT, report
+from scriptfix.run import (
+    CONTEXTS,
+    DEFAULT_SELF_TEST_TIMEOUT_S,
+    DEFAULT_TRIAL_TIMEOUT_S,
+    DEFAULT_TRIALS_ROOT,
+    EFFORTS,
+    SELF_TEST_MODEL,
+    TOOLS,
+    resolve_claude,
+    resolve_pwsh,
+    run_trials,
+    self_test,
+)
 
 PROG = "python -m scriptfix"
 
@@ -46,10 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Exit codes: 0 ok, 1 a control replay or a make-case capture was "
-            "surprising, 2 usage error."
+            "surprising, or a trial run hit a harness problem (or the self-test "
+            "failed), 2 usage error."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{grade,report,make-case}", required=True)
+    sub = parser.add_subparsers(dest="command", metavar="{grade,report,make-case,run}", required=True)
 
     grader = sub.add_parser(
         "grade",
@@ -124,7 +138,109 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print the diff reference -> input and the planned replays; replay and write nothing",
     )
+
+    runner = sub.add_parser(
+        "run",
+        help="run a case's one-shot headless trials, or check the launcher (--self-test)",
+        description=(
+            "Run N one-shot headless trials of a case with claude, strictly one at a time. "
+            "Each trial runs in a fresh <trials-root>/<NN>-run<N>/ holding only prompt.md and "
+            "inputs/; its stream log, stderr file and subject sidecar land beside that folder, "
+            "where the grader looks. The parent session's variables are stripped from claude's "
+            "environment and the real pwsh.exe goes first on its PATH. The batch stops at the "
+            "first harness problem (a non-zero exit, a timeout, no result line). "
+            "--self-test checks the launcher itself with one cheap run instead."
+        ),
+        epilog=(
+            "Exit codes: 0 ok, 1 a harness problem or a failed self-test, 2 usage error. "
+            "A trial is a real model call that costs money; only the self-test needs no case."
+        ),
+    )
+    runner.add_argument("--case", type=Path, default=None, help="the eval directory, e.g. evals/02-docs-journey-a")
+    runner.add_argument(
+        "--model",
+        default=None,
+        help=f"model id, passed through to claude as given (required for trials; --self-test defaults to {SELF_TEST_MODEL})",
+    )
+    how_many = runner.add_mutually_exclusive_group()
+    how_many.add_argument("--count", type=int, default=None, help="run this many new trials, numbered after the highest existing run")
+    how_many.add_argument("--runs", type=_runs_arg, default=None, help="run exactly these numbers: 13 or 1,3,5-7 (none may exist yet)")
+    runner.add_argument("--effort", choices=EFFORTS, default="default", help="claude's --effort; default omits the flag (default: default)")
+    runner.add_argument("--context", choices=CONTEXTS, default="none", help="context files given to the subject (default: none)")
+    runner.add_argument("--tools", choices=TOOLS, default="edit-only", help="the subject's tool profile (default: edit-only)")
+    runner.add_argument(
+        "--trials-root",
+        type=Path,
+        default=DEFAULT_TRIALS_ROOT,
+        help=f"folder that receives the trial folders and logs (default: {DEFAULT_TRIALS_ROOT.as_posix()})",
+    )
+    runner.add_argument("--claude", type=Path, default=None, help="the claude executable (default: claude on PATH)")
+    runner.add_argument("--pwsh", type=Path, default=None, help="the real pwsh.exe to put first on PATH, e.g. (Get-Process -Id $PID).Path (default: pwsh on PATH, unless that is the app-execution alias)")
+    runner.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        help=f"seconds before a trial is killed (default: {DEFAULT_TRIAL_TIMEOUT_S}; {DEFAULT_SELF_TEST_TIMEOUT_S} with --self-test)",
+    )
+    runner.add_argument("--dry-run", action="store_true", help="print the run numbers, folders, claude command lines and the environment names to strip; create and launch nothing")
+    runner.add_argument("--self-test", action="store_true", help="run the cheap harness check instead of a case (about $0.01); takes no --case, --count, --runs or --dry-run")
     return parser
+
+
+def _run_command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """The ``run`` subcommand: validate the arguments, then launch trials or the self-test."""
+    if args.self_test:
+        for flag, given in (
+            ("--case", args.case is not None),
+            ("--count", args.count is not None),
+            ("--runs", args.runs is not None),
+            ("--dry-run", args.dry_run),
+        ):
+            if given:
+                parser.error(f"{flag} is not used with --self-test")
+        model = args.model or SELF_TEST_MODEL
+        timeout_s = DEFAULT_SELF_TEST_TIMEOUT_S if args.timeout is None else args.timeout
+    else:
+        if args.case is None:
+            parser.error("--case is required (or use --self-test)")
+        if args.model is None:
+            parser.error("--model is required (or use --self-test)")
+        if args.count is None and args.runs is None:
+            parser.error("give --count N or --runs LIST")
+        if not args.case.is_dir():
+            parser.error(f"--case is not a directory: {args.case}")
+        model = args.model
+        timeout_s = DEFAULT_TRIAL_TIMEOUT_S if args.timeout is None else args.timeout
+    if timeout_s < 1:
+        parser.error("--timeout must be at least 1 second")
+    try:
+        pwsh = resolve_pwsh(args.pwsh)
+        claude = resolve_claude(args.claude)
+        if args.self_test:
+            return self_test(
+                model=model,
+                trials_root=args.trials_root,
+                claude_cmd=[str(claude)],
+                pwsh=pwsh,
+                timeout_s=timeout_s,
+            )
+        return run_trials(
+            args.case,
+            model=model,
+            effort=args.effort,
+            runs=args.runs,
+            count=args.count,
+            trials_root=args.trials_root,
+            claude_cmd=[str(claude)],
+            pwsh=pwsh,
+            timeout_s=timeout_s,
+            dry_run=args.dry_run,
+            context=args.context,
+            tools=args.tools,
+        )
+    except ValueError as exc:  # raised before the first launch
+        parser.error(str(exc))
+        return 2  # parser.error exits; keeps the return type honest
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -176,6 +292,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         except ValueError as exc:  # a bad case.toml or recipe.toml
             parser.error(str(exc))
+
+    if args.command == "run":
+        return _run_command(parser, args)
 
     for case in args.case or []:
         if not case.is_dir():
