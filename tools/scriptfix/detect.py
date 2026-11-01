@@ -32,7 +32,7 @@ from scriptfix.steps import (
     KIND_ASSERTION,
     KIND_NAVIGATION,
     TIMEOUT_SETTERS,
-    _ModuleFacts,
+    ModuleFacts,
     call_key,
     call_name,
     classify_module,
@@ -78,6 +78,8 @@ _COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
 _LOOPS = (ast.For, ast.AsyncFor, ast.While)
 # Exit calls as (module, name); a ``None`` module is a bare name.
 _EXIT_CALLS = frozenset({("sys", "exit"), ("os", "_exit"), (None, "exit"), (None, "quit")})
+# Sleep functions as (module, name), for a name from-imported from them.
+_SLEEP_FUNCTIONS = frozenset({("time", "sleep"), ("asyncio", "sleep")})
 _MAX_KEY_DETAIL = 70
 
 
@@ -102,7 +104,9 @@ class _Module:
         # The journey's classification: a detector's step is the journey's step.
         self.kinds = classify_module(self.tree)
         # The journey's reading of a ``**`` value that spells out its keywords.
-        self.facts = _ModuleFacts.of(self.tree)
+        self.facts = ModuleFacts.of(self.tree)
+        # Every expression a call goes through; the rest are values.
+        self.called = {id(n.func) for n in ast.walk(self.tree) if isinstance(n, ast.Call)}
         # alias -> imported module (``import time as t``)
         self.modules: dict[str, str] = {}
         # alias -> (module, name) (``from time import sleep as nap``)
@@ -147,13 +151,23 @@ class _Module:
             (n for n in ast.walk(self.tree) if isinstance(n, ast.Call)), key=_position
         )
 
+    def callee(self, call: ast.Call) -> ast.expr:
+        """What ``call`` calls, with ``getattr(<x>, "<name>")`` read as ``<x>.<name>``.
+
+        The reading is the journey's (``ModuleFacts.canonical_call``).
+        """
+        return self.facts.canonical_call(call).func
+
     def qualified(self, call: ast.Call) -> tuple[str | None, str | None]:
-        """Return ``(module, name)`` of the callee, resolving import aliases.
+        """Return ``(module, name)`` of the callee, resolving import aliases."""
+        return self.qualify(self.callee(call))
+
+    def qualify(self, func: ast.expr) -> tuple[str | None, str | None]:
+        """Return ``(module, name)`` of a name or attribute, resolving import aliases.
 
         ``module`` is only known for ``<Name>.<attr>`` and from-imports; any
         other receiver gives ``None``.
         """
-        func = call.func
         if isinstance(func, ast.Name):
             if func.id in self.names:
                 return self.names[func.id]
@@ -207,12 +221,46 @@ def _number(node: ast.expr) -> float | None:
 
 
 def _has_raise(handler: ast.ExceptHandler) -> bool:
-    """True when a ``raise`` is one of the handler body's own top-level statements.
+    """True when a ``raise`` is one of the handler body's own top-level statements
+    and no top-level ``return``/``break``/``continue`` comes before it.
 
     A raise nested in an ``if``/loop/``with``/``try``/``match`` only re-raises
-    some errors and swallows the rest, so it doesn't count.
+    some errors and swallows the rest, so it doesn't count; neither does one
+    that a statement before it has already left behind.
     """
-    return any(isinstance(statement, ast.Raise) for statement in handler.body)
+    for statement in handler.body:
+        if isinstance(statement, ast.Raise):
+            return True
+        if isinstance(statement, (ast.Return, ast.Break, ast.Continue)):
+            return False
+    return False
+
+
+def _finally_exit(statements: list[ast.stmt]) -> ast.stmt | None:
+    """The first ``return``, ``break`` or ``continue`` that leaves a ``finally`` body.
+
+    Nested functions don't count, and a ``break``/``continue`` inside a loop
+    of its own only leaves that loop.
+    """
+    stack = [(statement, False) for statement in reversed(statements)]
+    while stack:
+        node, in_loop = stack.pop()
+        if isinstance(node, (ast.Return, ast.Break, ast.Continue)):
+            if isinstance(node, ast.Return) or not in_loop:
+                return node
+        if isinstance(node, (*_SCOPE_BOUNDARIES, ast.ClassDef)):
+            continue
+        in_loop = in_loop or isinstance(node, _LOOPS)
+        stack.extend((child, in_loop) for child in reversed(list(ast.iter_child_nodes(node))))
+    return None
+
+
+def _returns_a_value(node: ast.Return) -> bool:
+    """False for a bare ``return``, ``return None`` and ``return False``; true otherwise."""
+    value = node.value
+    if value is None:
+        return False
+    return not (isinstance(value, ast.Constant) and (value.value is None or value.value is False))
 
 
 def _swallowed_errors(module: _Module) -> list[_Hit]:
@@ -224,18 +272,48 @@ def _swallowed_errors(module: _Module) -> list[_Hit]:
     for call in module.calls():
         if module.qualified(call)[1] == "suppress":
             hits.append(_Hit(_key(call), call.lineno, "suppress(...)"))
+        # ``gather(..., return_exceptions=True)`` hands the errors back as values.
+        named, _ = module.keywords(call)
+        for key, value in named:
+            if key == "return_exceptions" and not (
+                isinstance(value, ast.Constant) and value.value is False
+            ):
+                hits.append(_Hit(_key(call), call.lineno, f"return_exceptions={_key(value)}"))
+                break
+    for node in ast.walk(module.tree):
+        # A ``finally`` that ends the flow discards the exception in flight.
+        if isinstance(node, (ast.Try, ast.TryStar)):
+            leaving = _finally_exit(node.finalbody)
+            if leaving is not None:
+                hits.append(
+                    _Hit(f"finally: {_key(leaving)}", leaving.lineno, "finally that ends the flow")
+                )
+        # A context manager whose ``__exit__`` returns a truthy value eats the error.
+        elif isinstance(node, _FUNCTIONS) and node.name in ("__exit__", "__aexit__"):
+            for inner in _own_nodes(node.body):
+                if isinstance(inner, ast.Return) and _returns_a_value(inner):
+                    what = f"{node.name} returns a value"
+                    hits.append(_Hit(f"{node.name}: {_key(inner)}", inner.lineno, what))
+                    break
     return sorted(hits, key=lambda h: h.line)
 
 
 def _sleeps(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
+        func = module.callee(call)
         name = module.qualified(call)[1]
-        if name == "sleep" or (
-            isinstance(call.func, ast.Attribute) and call.func.attr == "wait_for_timeout"
-        ):
+        if name == "sleep" or (isinstance(func, ast.Attribute) and func.attr == "wait_for_timeout"):
             hits.append(_Hit(_key(call), call.lineno, f"{name} call"))
-    return hits
+    # A sleep function passed around or bound to a name (``nap = asyncio.sleep``).
+    for node in ast.walk(module.tree):
+        if id(node) in module.called or not isinstance(getattr(node, "ctx", None), ast.Load):
+            continue
+        if (isinstance(node, ast.Attribute) and node.attr in ("sleep", "wait_for_timeout")) or (
+            isinstance(node, ast.Name) and module.qualify(node) in _SLEEP_FUNCTIONS
+        ):
+            hits.append(_Hit(_key(node), node.lineno, "sleep used as a value"))
+    return sorted(hits, key=lambda h: h.line)
 
 
 def _timeout_too_long(value: ast.expr, limit_ms: int) -> bool:
@@ -250,22 +328,22 @@ def _timeout_setter_uses(module: _Module) -> list[_Hit]:
     The call through the alias isn't recognizable, so the use itself is the
     hit; the setter named as a call's ``func`` is checked by its arguments.
     """
-    called = {id(call.func) for call in module.calls()}
     return [
         _Hit(_key(node), node.lineno, f"timeout setter {node.attr} used as a value")
         for node in ast.walk(module.tree)
         if isinstance(node, ast.Attribute)
         and isinstance(node.ctx, ast.Load)
         and node.attr in TIMEOUT_SETTERS
-        and id(node) not in called
+        and id(node) not in module.called
     ]
 
 
 def _longer_timeouts(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
-        func = call.func
-        name = call_name(call)
+        canonical = module.facts.canonical_call(call)
+        func = canonical.func
+        name = call_name(canonical)
         named, opaque = module.keywords(call)
         timeouts = [value for key, value in named if key == "timeout"]
         limit = DEFAULT_TIMEOUT_MS
@@ -314,7 +392,12 @@ def _conditional_parts(node: ast.AST) -> list[ast.AST] | None:
     if isinstance(node, (ast.If, *_LOOPS)):
         return [*node.body, *node.orelse]
     if isinstance(node, ast.Match):
-        return [stmt for case in node.cases for stmt in case.body]
+        # A case's guard runs only when its pattern matched, so it may be skipped too.
+        return [
+            part
+            for case in node.cases
+            for part in (*([case.guard] if case.guard is not None else []), *case.body)
+        ]
     if isinstance(node, (ast.IfExp, ast.BoolOp, *_COMPREHENSIONS)):
         return [node]
     return None
@@ -357,6 +440,14 @@ def _forced_exits(module: _Module) -> list[_Hit]:
         if qualified in _EXIT_CALLS:
             hits.append(_Hit(_key(call), call.lineno, f"{qualified[1]} call"))
     for node in ast.walk(module.tree):
+        # An exit function handed to a scheduler or stored (``call_soon(sys.exit, 0)``).
+        if (
+            isinstance(node, (ast.Name, ast.Attribute))
+            and isinstance(node.ctx, ast.Load)
+            and id(node) not in module.called
+            and module.qualify(node) in _EXIT_CALLS
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{_key(node)} used as a value"))
         if isinstance(node, ast.Raise) and node.exc is not None:
             exc = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
             if isinstance(exc, ast.Name) and exc.id == "SystemExit":

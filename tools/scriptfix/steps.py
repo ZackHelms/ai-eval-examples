@@ -286,7 +286,7 @@ def extract_steps(source: str) -> list[Step]:
 
 
 def _walk(tree: ast.Module) -> _Extractor:
-    facts = _ModuleFacts.of(tree)
+    facts = ModuleFacts.of(tree)
     extractor = _Extractor(facts)
     # A ``global`` declaration anywhere lets a function rebind a module name,
     # so those names are never substituted at module level, and never stand
@@ -341,7 +341,7 @@ def _module_bindings(tree: ast.Module) -> Iterator[tuple[str, bool]]:
 
 
 @dataclass(frozen=True)
-class _ModuleFacts:
+class ModuleFacts:
     """What the classification needs to know about the whole module."""
 
     # The bare name ``expect`` is Playwright's.
@@ -352,7 +352,7 @@ class _ModuleFacts:
     dynamic_names: bool = False
 
     @classmethod
-    def of(cls, tree: ast.Module) -> _ModuleFacts:
+    def of(cls, tree: ast.Module) -> ModuleFacts:
         bindings = list(_module_bindings(tree))
         # Any star import may bind ``expect`` or a built-in name; a star
         # import from Playwright binds Playwright's ``expect``.
@@ -408,6 +408,24 @@ class _ModuleFacts:
         if isinstance(name, ast.Constant) and isinstance(name.value, str):
             return name.value if name.value.isidentifier() else None
         return None
+
+    def canonical_call(self, call: ast.Call) -> ast.Call:
+        """``call``, with ``getattr(<expr>, "<name>")(...)`` read as ``<expr>.<name>(...)``.
+
+        The result keeps the call's position, so ``call_key`` still matches
+        the raw call the detectors look up.
+        """
+        inner = call.func
+        if not isinstance(inner, ast.Call):
+            return call
+        name = self.getattr_name(inner)
+        if name is None:
+            return call
+        attribute = ast.Attribute(value=inner.args[0], attr=name, ctx=ast.Load())
+        ast.copy_location(attribute, inner)
+        canonical = copy.copy(call)
+        canonical.func = attribute
+        return canonical
 
     def literal_keywords(self, value: ast.expr) -> list[tuple[str, ast.expr]] | None:
         """The keywords a ``**`` value spells out, or ``None`` when it may hold others.
@@ -807,7 +825,7 @@ def _marker_label(call: ast.Call, normalize: Callable[[ast.AST], str]) -> str:
 class _Extractor:
     """Walks statements and expressions in source order, collecting steps."""
 
-    def __init__(self, facts: _ModuleFacts) -> None:
+    def __init__(self, facts: ModuleFacts) -> None:
         self.facts = facts
         self.steps: list[Step] = []
         self.kinds: dict[CallKey, str] = {}
@@ -985,7 +1003,7 @@ class _Extractor:
         or assertion is searched but isn't a step, and neither is an action
         with a ``trial=`` other than ``False``.
         """
-        call = self.canonical_call(call)
+        call = self.facts.canonical_call(call)
         func = call.func
         if not isinstance(func, ast.Attribute):
             return False
@@ -1007,24 +1025,6 @@ class _Extractor:
         self.kinds[call_key(call)] = kind
         self.steps.append(Step(kind, func.attr, target, values, options, call.lineno))
         return True
-
-    def canonical_call(self, call: ast.Call) -> ast.Call:
-        """``call``, with ``getattr(<expr>, "<name>")(...)`` read as ``<expr>.<name>(...)``.
-
-        The result keeps the call's position, so ``call_key`` still matches
-        the raw call the detectors look up.
-        """
-        inner = call.func
-        if not isinstance(inner, ast.Call):
-            return call
-        name = self.facts.getattr_name(inner)
-        if name is None:
-            return call
-        attribute = ast.Attribute(value=inner.args[0], attr=name, ctx=ast.Load())
-        ast.copy_location(attribute, inner)
-        canonical = copy.copy(call)
-        canonical.func = attribute
-        return canonical
 
     def arguments(self, call: ast.Call) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
         """Split a call's arguments into normalized values and options.

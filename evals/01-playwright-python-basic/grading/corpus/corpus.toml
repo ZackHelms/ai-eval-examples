@@ -125,3 +125,27 @@ tags = ["longer-timeout"]
 
 [files."zero-expect-alias-set-options.py"]
 tags = ["longer-timeout"]
+
+[files."zero-getattr-suppress.py"]
+tags = ["swallowed-error"]
+
+[files."zero-sleep-alias.py"]
+tags = ["sleep"]
+
+[files."zero-exit-callback.py"]
+tags = ["forced-exit"]
+
+[files."zero-swallow-gather.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-dead-raise.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-finally-return.py"]
+tags = ["swallowed-error"]
+
+[files."zero-swallow-exit-true.py"]
+tags = ["swallowed-error"]
+
+[files."zero-match-guard.py"]
+tags = ["conditional-step"]
