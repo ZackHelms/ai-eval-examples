@@ -2,6 +2,55 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — Grader hardening, the red-team agent and the trial
+  tool allowlist (oversee run of
+  `.claude/plans/DONE/grader-01bb.hardening.md`):
+  - **The red-team agent.** `.claude/agents/grader-red-team.md` writes
+    fake-fix variants of a case's reference and runs the static checks on
+    them. On Eval 01 it wrote 30 variants and 26 slipped past the grader.
+    19 of those 26 are now caught, and one false zero is fixed. Each fixed
+    variant is now a labelled file in Eval 01's corpus, which grew from 23
+    files to 50, counting the plan's own 6.
+  - **One shared classification.** `steps.classify_module` now feeds both
+    the journey and the detectors, with these rules:
+    - a step-named method on a provable non-Playwright receiver isn't a
+      step (the CD's "Exclude proven non-PW");
+    - the same goes for an un-awaited coroutine, a `trial=` click and a
+      shadowed `expect`;
+    - an `expect` held in a name is still an assertion;
+    - steps nested in a call's arguments count.
+  - **Normalization:**
+    - module constants (off when the module calls `globals()` and the
+      like);
+    - `**{…}` and `**dict(…)` split like keywords;
+    - `getattr(x, "name")`;
+    - `visible=False` flips the matcher.
+  - **Detectors:**
+    - timeouts are now caught through `**`, on unclassified calls and in
+      aliased setters;
+    - sleeps and exits are caught when used as values;
+    - swallowed errors are caught through `return_exceptions=`, a
+      `finally` that leaves, a truthy `__exit__` and an unreachable
+      `raise`;
+    - `match` guards count;
+    - answer-key searches above the repo are caught.
+  - **Escalate cases:** the blocked step is found by its position, so all
+    four grader-01c shapes are zeros. Integrity check 11 holds each
+    escalate input to its reference plus one step. Case 06 gained 2 corpus
+    files.
+  - **Trials:** they see only Read, Glob, Grep, Edit, Write, Bash and
+    PowerShell (`--tools`), and the sidecar records `tool_list`. The live
+    self-test passed with exactly those seven, for $0.0028.
+  - **Scripts and gate:**
+    - `30-grade-trials.ps1` resolves paths against your current folder and
+      exits 2 on usage errors;
+    - the gate fails on stray control characters.
+  - **Checks:**
+    - Eval 01's 12 verdicts are unchanged (a static calibration with a
+      fake replay);
+    - the gate is at 1104 passed and 11 skipped (it was 838 and 6).
+  - **Still open:** 7 red-team misses and 3 rubric questions (TODO.md).
+
 - **2026-11-01** — Decided (the CD, at a `/zmh-producer:backlog-plan-gen`
   interview): the Windows user-profile path in captured evidence stays.
   Each case's `inputs/results.txt` and trace name `C:\Users\<you>\AppData\…`

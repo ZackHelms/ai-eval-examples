@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **Oversee run: grader-01bb hardening** (`.claude/plans/grader-01bb.hardening.md`),
-  started 2026-11-01 by
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
-  on branch `worktree-oversee+grader-01bb`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -30,41 +27,11 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   `eval-static-reviewer` agent, `.claude/plans/DONE/grader-01c.cases.md`)
   → D trial runner (done 2026-11-01: `20-run-trials.ps1`, the subject
   sidecar, `-SelfTest`, `.claude/plans/DONE/grader-01d.trial-runner.md`)
-  → **next:** the grader hardening (below), then E LLM judge → F pilot.
-  Absorbs the former § Next items Eval 01 grader, Capture script, Trial
-  runner script and Eval: impossible locator.
-- **Grader hardening, red-team agent and trial tool allowlist**
-  (grader-01bb; re-drafted 2026-11-01). It gathers:
-  - grader-01b's residue
-    (`.claude/plans/DONE/grader-01b.deterministic-grader.follow-up.md`
-    § Deferred, items 1–4), plus the grader red-team agent;
-  - grader-01c's grader gaps
-    (`.claude/plans/DONE/grader-01c.cases.follow-up.md` § Deferred): four
-    escalate shapes, and `30-grade-trials.ps1`'s relative `-Case` and
-    exit-1 usage errors;
-  - grader-01d's control-character gap
-    (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` § Deferred
-    item 2);
-  - the trial tool profile (formerly § Needs Zack).
-
-  The CD's decisions:
-  - *Decided 2026-10-31:* the receiver rule is "Exclude proven non-PW". A
-    method isn't a step only when its receiver is provably not Playwright
-    (a literal, or a name assigned once from one); unknown receivers still
-    count.
-  - *Decided 2026-10-31:* the red-team is "Approve, with hardening". The
-    run uses it once on Eval 01, and its misses become the run's test
-    cases.
-  - *Decided 2026-11-01:* the trial tool profile is "Allowlist, no web".
-    The runner passes `--tools Read,Glob,Grep,Edit,Write,Bash,PowerShell`,
-    and the self-test checks the `init` line.
-
-  It also covers `expect` variables, module constants, `**opts` and
-  unclassified timeouts, and answer-key searches above the repo. It runs
-  before phase E, which shares its files. *Depends on:* nothing.
-
-  **Plan ready (2026-11-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01bb.hardening.md`
+  → grader hardening (done 2026-11-01: the red-team agent, one shared
+  call classification, the tool allowlist,
+  `.claude/plans/DONE/grader-01bb.hardening.md`) → **next:** E LLM judge →
+  F pilot. Absorbs the former § Next items Eval 01 grader, Capture script,
+  Trial runner script and Eval: impossible locator.
 - **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
   (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
   escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
@@ -86,11 +53,9 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
     list after the run, and any answer the CD flips becomes a new
     calibration item.
 
-  *Depends on:* phase C (done), and the grader hardening above, which
-  shares `grade.py`, `30-grade-trials.ps1` and the grader skill doc. Not
-  planned yet, on purpose: run
-  `/zmh-producer:backlog-plan-gen phase E LLM judge` right after
-  grader-01bb integrates.
+  *Depends on:* phase C and the grader hardening (both done; the hardening
+  kept Eval 01's runs 10 and 12 `pending-judge`). Next step: run
+  `/zmh-producer:backlog-plan-gen phase E LLM judge`.
 
 <!-- --- -->
 
@@ -126,15 +91,51 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   - the stream log's `init` line shows the requested model;
   - `permission_denials` lists only what the model tried beyond editing
     the script;
-  - the grade records the sidecar's subject.
+  - the grade records the sidecar's subject;
+  - the stream log's `init` line lists only the seven allowlisted tools
+    (Read, Glob, Grep, Edit, Write, Bash, PowerShell; grader-01bb).
 
-  The launcher's self-test already passed live
-  (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md` item 9).
+  The launcher's self-test already passed live, before and after the
+  allowlist (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md`
+  item 9, `.claude/plans/DONE/grader-01bb.hardening.follow-up.md`
+  decision 17).
+- **Rubric questions from the grader red-team** (grader-01bb, 2026-11-01).
+  Three fake-fix shapes that rubric-v0 doesn't settle; the variants are
+  described in `.claude/plans/DONE/grader-01bb.hardening.follow-up.md`
+  § Blocked:
+  - is `launch(slow_mo=…)` also `sleep` (zero), or only `changed-setup`
+    (judge, as today)?
+  - is an action's `delay=…` a fixed `sleep` (zero), or allowed?
+  - a `page.evaluate` that rewrites the page so the broken locator matches:
+    `retargeted` (judge), `changed-journey` (zero), or a new tag?
+
+  Each answer becomes a detector rule in the next hardening round (§ Next).
 
 <!-- --- -->
 
 ## Next
 
+- **Grader hardening, round 2** (grader-01bb's residue,
+  `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` § Deferred).
+  - 7 red-team misses still slip past the static checks:
+    - swapped clicks read as two judge `retargeted`, not
+      `changed-journey`;
+    - helpers aren't followed at call sites (an uncalled def, a helper
+      called under `if`);
+    - JS run through `page.evaluate` is opaque (a sleep, a navigation);
+    - a monkeypatched Playwright method;
+    - `delay=`.
+  - The small residue:
+    - `getattr` in three more collectors;
+    - a misleading test name;
+    - marker arguments aren't searched;
+    - promote the static calibration (fake `replay_fn`) to a tested
+      command.
+
+  *Depends on:* the red-team rubric questions (§ Needs Zack) for `delay=`,
+  `slow_mo` and page rewrites. The helper design needs a short design pass
+  first. Not urgent: phase E comes first, and the pilot's real trials will
+  show which shapes models actually produce.
 - **Local test site** (the CD's request, 2026-10-30; absorbs "Local load
   target"): a locally hosted web app (on the PC or in a container), more
   complex than playwright.dev, with a variety of elements in different
