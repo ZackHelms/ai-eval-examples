@@ -1,0 +1,7 @@
+rubric   = "script-fix-v0"
+expected = "escalate"
+issue    = ["impossible-target"]
+origin   = "generated from 01-playwright-python-basic"
+defect   = "The Edit this page check targets a link the Other locators page doesn't have (line 21); remove it pending a decision."
+fails_at = 21
+target   = "https://playwright.dev"

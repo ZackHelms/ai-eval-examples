@@ -1,0 +1,1096 @@
+Traceback (most recent call last):
+  File "C:\Users\zmhel\AppData\Local\Temp\pwrun\script.py", line 36, in <module>
+    asyncio.run(main())
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zmhel\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 684, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\zmhel\AppData\Local\Temp\pwrun\script.py", line 33, in main
+    await run(playwright)
+  File "C:\Users\zmhel\AppData\Local\Temp\pwrun\script.py", line 21, in run
+    await expect(page.get_by_role("link", name="Edit this page")).to_be_visible()
+  File "C:\Users\zmhel\AppData\Local\pwrun\venv\Lib\site-packages\playwright\async_api\_generated.py", line 14711, in to_be_visible
+    await self._impl_obj.to_be_visible(
+  File "C:\Users\zmhel\AppData\Local\pwrun\venv\Lib\site-packages\playwright\_impl\_assertions.py", line 852, in to_be_visible
+    await self._expect_impl(
+  File "C:\Users\zmhel\AppData\Local\pwrun\venv\Lib\site-packages\playwright\_impl\_assertions.py", line 128, in _expect_impl
+    _record_soft_or_raise(
+  File "C:\Users\zmhel\AppData\Local\pwrun\venv\Lib\site-packages\playwright\_impl\_assertions.py", line 60, in _record_soft_or_raise
+    raise error
+AssertionError: Locator expected to be visible
+Actual value: None
+Error: element(s) not found 
+Call log:
+  - Expect "to_be_visible" get_by_role("link", name="Edit this page") with timeout 5000ms
+  - waiting for get_by_role("link", name="Edit this page")
+
+Aria snapshot:
+- region "Skip to main content":
+  - link "Skip to main content":
+    - /url: "#__docusaurus_skipToContent_fallback"
+- navigation "Main":
+  - link "Playwright logo Playwright for Python":
+    - /url: /python/
+    - img "Playwright logo"
+    - text: Playwright for Python
+  - link "Docs":
+    - /url: /python/docs/intro
+  - link "API":
+    - /url: /python/docs/api/class-playwright
+  - button "Python"
+  - link "Community":
+    - /url: /python/community/welcome
+  - link "GitHub repository":
+    - /url: https://github.com/microsoft/playwright-python
+  - link "Discord server":
+    - /url: https://aka.ms/playwright/discord
+  - button "Switch between dark and light mode (currently system mode)"
+  - button "Search (Control+k)": Search Ctrl K
+- complementary:
+  - navigation "Docs sidebar":
+    - list:
+      - listitem:
+        - button "Getting Started" [expanded]
+        - list:
+          - listitem:
+            - link "Installation":
+              - /url: /python/docs/intro
+          - listitem:
+            - link "Writing tests":
+              - /url: /python/docs/writing-tests
+          - listitem:
+            - link "Generating tests":
+              - /url: /python/docs/codegen-intro
+          - listitem:
+            - link "Running and debugging tests":
+              - /url: /python/docs/running-tests
+          - listitem:
+            - link "Trace viewer":
+              - /url: /python/docs/trace-viewer-intro
+          - listitem:
+            - link "Setting up CI":
+              - /url: /python/docs/ci-intro
+          - listitem:
+            - link "Pytest Plugin Reference":
+              - /url: /python/docs/test-runners
+      - listitem:
+        - link "Getting started - Library":
+          - /url: /python/docs/library
+      - listitem:
+        - link "Release notes":
+          - /url: /python/docs/release-notes
+      - listitem:
+        - button "Guides" [expanded]
+        - list:
+          - listitem:
+            - link "Actions":
+              - /url: /python/docs/input
+          - listitem:
+            - link "Auto-waiting":
+              - /url: /python/docs/actionability
+          - listitem:
+            - link "API testing":
+              - /url: /python/docs/api-testing
+          - listitem:
+            - link "Assertions":
+              - /url: /python/docs/test-assertions
+          - listitem:
+            - link "Authentication":
+              - /url: /python/docs/auth
+          - listitem:
+            - link "Browsers":
+              - /url: /python/docs/browsers
+          - listitem:
+            - link "Chrome extensions":
+              - /url: /python/docs/chrome-extensions
+          - listitem:
+            - link "Clock":
+              - /url: /python/docs/clock
+          - listitem:
+            - link "Debugging Tests":
+              - /url: /python/docs/debug
+          - listitem:
+            - link "Dialogs":
+              - /url: /python/docs/dialogs
+          - listitem:
+            - link "Downloads":
+              - /url: /python/docs/downloads
+          - listitem:
+            - link "Emulation":
+              - /url: /python/docs/emulation
+          - listitem:
+            - link "Evaluating JavaScript":
+              - /url: /python/docs/evaluating
+          - listitem:
+            - link "Events":
+              - /url: /python/docs/events
+          - listitem:
+            - link "Extensibility":
+              - /url: /python/docs/extensibility
+          - listitem:
+            - link "Frames":
+              - /url: /python/docs/frames
+          - listitem:
+            - link "Handles":
+              - /url: /python/docs/handles
+          - listitem:
+            - link "Isolation":
+              - /url: /python/docs/browser-contexts
+          - listitem:
+            - link "Locators":
+              - /url: /python/docs/locators
+          - listitem:
+            - link "Mock APIs":
+              - /url: /python/docs/mock
+          - listitem:
+            - link "Navigations":
+              - /url: /python/docs/navigations
+          - listitem:
+            - link "Network":
+              - /url: /python/docs/network
+          - listitem:
+            - link "Other locators":
+              - /url: /python/docs/other-locators
+          - listitem:
+            - link "Pages":
+              - /url: /python/docs/pages
+          - listitem:
+            - link "Page object models":
+              - /url: /python/docs/pom
+          - listitem:
+            - link "Screenshots":
+              - /url: /python/docs/screenshots
+          - listitem:
+            - link "Snapshot testing":
+              - /url: /python/docs/aria-snapshots
+          - listitem:
+            - link "Test generator":
+              - /url: /python/docs/codegen
+          - listitem:
+            - link "Touch events (legacy)":
+              - /url: /python/docs/touch-events
+          - listitem:
+            - link "Trace viewer":
+              - /url: /python/docs/trace-viewer
+          - listitem:
+            - link "Videos":
+              - /url: /python/docs/videos
+          - listitem:
+            - link "WebView2":
+              - /url: /python/docs/webview2
+      - listitem:
+        - button "Integrations"
+      - listitem:
+        - link "Supported languages":
+          - /url: /python/docs/languages
+- main:
+  - article:
+    - navigation "Breadcrumbs":
+      - list:
+        - listitem:
+          - link "Home page":
+            - /url: /python/
+            - img
+        - listitem: Guides
+        - listitem: Other locators
+    - heading "Other locators" [level=1]
+    - heading "IntroductionDirect link to Introduction" [level=2]:
+      - text: Introduction
+      - link "Direct link to Introduction":
+        - /url: "#introduction"
+        - text: "#"
+    - img
+    - text: note
+    - paragraph:
+      - text: Check out the main
+      - link "locators guide":
+        - /url: /python/docs/locators
+      - text: for most common and recommended locators.
+    - paragraph:
+      - text: In addition to recommended locators like
+      - link "page.get_by_role()":
+        - /url: /python/docs/api/class-page#page-get-by-role
+      - text: and
+      - link "page.get_by_text()":
+        - /url: /python/docs/api/class-page#page-get-by-text
+      - text: ", Playwright supports a variety of other locators described in this guide."
+    - heading "CSS locatorDirect link to CSS locator" [level=2]:
+      - text: CSS locator
+      - link "Direct link to CSS locator":
+        - /url: "#css-locator"
+        - text: "#"
+    - img
+    - text: note
+    - paragraph:
+      - text: We recommend prioritizing
+      - link "user-visible locators":
+        - /url: /python/docs/locators#quick-guide
+      - text: like text or accessible role instead of using CSS that is tied to the implementation and could break when the page changes.
+    - paragraph: Playwright can locate an element by CSS selector.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: page.locator("css=button").click()
+      - button "Copy code to clipboard"
+    - paragraph: "Playwright augments standard CSS selectors in two ways:"
+    - list:
+      - listitem: CSS selectors pierce open shadow DOM.
+      - listitem:
+        - text: Playwright adds custom pseudo-classes like
+        - code: :visible
+        - text: ","
+        - code: :has-text()
+        - text: ","
+        - code: :has()
+        - text: ","
+        - code: :is()
+        - text: ","
+        - code: :nth-match()
+        - text: and more.
+    - 'heading "CSS: matching by textDirect link to CSS: matching by text" [level=3]':
+      - text: "CSS: matching by text"
+      - 'link "Direct link to CSS: matching by text"':
+        - /url: "#css-matching-by-text"
+        - text: "#"
+    - paragraph: Playwright include a number of CSS pseudo-classes to match elements by their text content.
+    - list:
+      - listitem:
+        - paragraph:
+          - code: article:has-text("Playwright")
+          - text: "- the"
+          - code: :has-text()
+          - text: matches any element containing specified text somewhere inside, possibly in a child or a descendant element. Matching is case-insensitive, trims whitespace and searches for a substring.
+        - paragraph:
+          - text: For example,
+          - code: article:has-text("Playwright")
+          - text: matches
+          - code: <article><div>Playwright</div></article>
+          - text: .
+        - paragraph:
+          - text: Note that
+          - code: :has-text()
+          - text: should be used together with other CSS specifiers, otherwise it will match all the elements containing specified text, including the
+          - code: <body>
+          - text: .
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: "# Wrong, will match many elements including <body> page.locator(':has-text(\"Playwright\")').click() # Correct, only matches the <article> element page.locator('article:has-text(\"All products\")').click()"
+          - button "Copy code to clipboard"
+      - listitem:
+        - paragraph:
+          - code: "#nav-bar :text(\"Home\")"
+          - text: "- the"
+          - code: :text()
+          - text: pseudo-class matches the smallest element containing specified text. Matching is case-insensitive, trims whitespace and searches for a substring.
+        - paragraph:
+          - text: For example, this will find an element with text "Home" somewhere inside the
+          - code: "#nav-bar"
+          - text: "element:"
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("#nav-bar :text('Home')").click()
+          - button "Copy code to clipboard"
+      - listitem:
+        - paragraph:
+          - code: "#nav-bar :text-is(\"Home\")"
+          - text: "- the"
+          - code: :text-is()
+          - text: pseudo-class matches the smallest element with exact text. Exact matching is case-sensitive, trims whitespace and searches for the full string.
+        - paragraph:
+          - text: For example,
+          - code: :text-is("Log")
+          - text: does not match
+          - code: <button>Log in</button>
+          - text: because
+          - code: <button>
+          - text: contains a single text node
+          - code: "\"Log in\""
+          - text: that is not equal to
+          - code: "\"Log\""
+          - text: . However,
+          - code: :text-is("Log")
+          - text: matches
+          - code: <button> Log <span>in</span></button>
+          - text: ", because"
+          - code: <button>
+          - text: contains a text node
+          - code: "\" Log \""
+          - text: .
+        - paragraph:
+          - text: Similarly,
+          - code: :text-is("Download")
+          - text: will not match
+          - code: <button>download</button>
+          - text: because it is case-sensitive.
+    - list:
+      - listitem:
+        - paragraph:
+          - code: "#nav-bar :text-matches(\"reg?ex\", \"i\")"
+          - text: "- the"
+          - code: :text-matches()
+          - text: pseudo-class matches the smallest element with text content matching the
+          - link "JavaScript-like regex":
+            - /url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp
+          - text: .
+        - paragraph:
+          - text: For example,
+          - code: :text-matches("Log\s*in", "i")
+          - text: matches
+          - code: <button>Login</button>
+          - text: and
+          - code: <button>log IN</button>
+          - text: .
+    - img
+    - text: note
+    - paragraph: Text matching always normalizes whitespace. For example, it turns multiple spaces into one, turns line breaks into spaces and ignores leading and trailing whitespace.
+    - img
+    - text: note
+    - paragraph:
+      - text: Input elements of the type
+      - code: button
+      - text: and
+      - code: submit
+      - text: are matched by their
+      - code: value
+      - text: instead of text content. For example,
+      - code: :text("Log in")
+      - text: matches
+      - code: <input type=button value="Log in">
+      - text: .
+    - 'heading "CSS: matching only visible elementsDirect link to CSS: matching only visible elements" [level=3]':
+      - text: "CSS: matching only visible elements"
+      - 'link "Direct link to CSS: matching only visible elements"':
+        - /url: "#css-matching-only-visible-elements"
+        - text: "#"
+    - paragraph:
+      - text: Playwright supports the
+      - code: :visible
+      - text: pseudo class in CSS selectors. For example,
+      - code: css=button
+      - text: matches all the buttons on the page, while
+      - code: css=button:visible
+      - text: only matches visible buttons. This is useful to distinguish elements that are very similar but differ in visibility.
+    - img
+    - text: note
+    - paragraph:
+      - text: Prefer the
+      - link "locator.visible":
+        - /url: /python/docs/api/class-locator#locator-visible
+      - text: shortcut over the
+      - code: :visible
+      - text: pseudo-class.
+    - paragraph: Consider a page with two buttons, first invisible and second visible.
+    - code: "<button style='display: none'>Invisible</button> <button>Visible</button>"
+    - button "Copy code to clipboard"
+    - list:
+      - listitem:
+        - paragraph:
+          - text: This will find both buttons and throw a
+          - link "strictness":
+            - /url: /python/docs/locators#strictness
+          - text: "violation error:"
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("button").click()
+          - button "Copy code to clipboard"
+      - listitem:
+        - paragraph: This will only find a second button, because it is visible, and then click it.
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("button:visible").click()
+          - button "Copy code to clipboard"
+    - 'heading "CSS: elements that contain other elementsDirect link to CSS: elements that contain other elements" [level=3]':
+      - text: "CSS: elements that contain other elements"
+      - 'link "Direct link to CSS: elements that contain other elements"':
+        - /url: "#css-elements-that-contain-other-elements"
+        - text: "#"
+    - paragraph:
+      - text: The
+      - code: :has()
+      - text: pseudo-class is a
+      - link "CSS pseudo-class":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/CSS/:has
+      - text: . It returns an element if any of the selectors passed as parameters relative to the
+      - code: :scope
+      - text: of the given element match at least one element.
+    - paragraph:
+      - text: Following snippet returns text content of an
+      - code: <article>
+      - text: element that has a
+      - code: <div class=promo>
+      - text: inside.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: page.locator("article:has(div.promo)").text_content()
+      - button "Copy code to clipboard"
+    - 'heading "CSS: elements matching one of the conditionsDirect link to CSS: elements matching one of the conditions" [level=3]':
+      - text: "CSS: elements matching one of the conditions"
+      - 'link "Direct link to CSS: elements matching one of the conditions"':
+        - /url: "#css-elements-matching-one-of-the-conditions"
+        - text: "#"
+    - paragraph: Comma-separated list of CSS selectors will match all elements that can be selected by one of the selectors in that list.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Clicks a <button> that has either a \"Log in\" or \"Sign in\" text. page.locator('button:has-text(\"Log in\"), button:has-text(\"Sign in\")').click()"
+      - button "Copy code to clipboard"
+    - paragraph:
+      - text: The
+      - code: :is()
+      - text: pseudo-class is a
+      - link "CSS pseudo-class":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/CSS/:is
+      - text: that may be useful for specifying a list of extra conditions on an element.
+    - 'heading "CSS: matching elements based on layoutDirect link to CSS: matching elements based on layout" [level=3]':
+      - text: "CSS: matching elements based on layout"
+      - 'link "Direct link to CSS: matching elements based on layout"':
+        - /url: "#css-matching-elements-based-on-layout"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph: Layout selectors are deprecated and may be removed in the future. Matching based on layout may produce unexpected results. For example, a different element could be matched when layout changes by one pixel.
+    - paragraph:
+      - text: We recommend prioritizing
+      - link "user-visible locators":
+        - /url: /python/docs/locators#quick-guide
+      - text: instead.
+    - paragraph: Sometimes, it is hard to come up with a good selector to the target element when it lacks distinctive features. In this case, using Playwright layout CSS pseudo-classes could help. These can be combined with regular CSS to pinpoint one of the multiple choices.
+    - paragraph:
+      - text: For example,
+      - code: input:right-of(:text("Password"))
+      - text: matches an input field that is to the right of text "Password" - useful when the page has multiple inputs that are hard to distinguish between each other.
+    - paragraph:
+      - text: Note that layout pseudo-classes are useful in addition to something else, like
+      - code: input
+      - text: . If you use a layout pseudo-class alone, like
+      - code: :right-of(:text("Password"))
+      - text: ", most likely you'll get not the input you are looking for, but some empty element in between the text and the target input."
+    - paragraph:
+      - text: Layout pseudo-classes use
+      - link "bounding client rect":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+      - text: to compute distance and relative position of the elements.
+    - list:
+      - listitem:
+        - code: :right-of(div > button)
+        - text: "- Matches elements that are to the right of any element matching the inner selector, at any vertical position."
+      - listitem:
+        - code: :left-of(div > button)
+        - text: "- Matches elements that are to the left of any element matching the inner selector, at any vertical position."
+      - listitem:
+        - code: :above(div > button)
+        - text: "- Matches elements that are above any of the elements matching the inner selector, at any horizontal position."
+      - listitem:
+        - code: :below(div > button)
+        - text: "- Matches elements that are below any of the elements matching the inner selector, at any horizontal position."
+      - listitem:
+        - code: :near(div > button)
+        - text: "- Matches elements that are near (within 50 CSS pixels) any of the elements matching the inner selector."
+    - paragraph:
+      - text: Note that resulting matches are sorted by their distance to the anchor element, so you can use
+      - link "locator.first":
+        - /url: /python/docs/api/class-locator#locator-first
+      - text: to pick the closest one. This is only useful if you have something like a list of similar elements, where the closest is obviously the right one. However, using
+      - link "locator.first":
+        - /url: /python/docs/api/class-locator#locator-first
+      - text: in other cases most likely won't work as expected - it will not target the element you are searching for, but some other element that happens to be the closest like a random empty
+      - code: <div>
+      - text: ", or an element that is scrolled out and is not currently visible."
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Fill an input to the right of \"Username\". page.locator(\"input:right-of(:text(\\\"Username\\\"))\").fill(\"value\") # Click a button near the promo card. page.locator(\"button:near(.promo-card)\").click() # Click the radio input in the list closest to the \"Label 3\". page.locator(\"[type=radio]:left-of(:text(\\\"Label 3\\\"))\").first.click()"
+      - button "Copy code to clipboard"
+    - paragraph:
+      - text: All layout pseudo-classes support optional maximum pixel distance as the last argument. For example
+      - code: button:near(:text("Username"), 120)
+      - text: matches a button that is at most 120 CSS pixels away from the element with the text "Username".
+    - 'heading "CSS: pick n-th match from the query resultDirect link to CSS: pick n-th match from the query result" [level=3]':
+      - text: "CSS: pick n-th match from the query result"
+      - 'link "Direct link to CSS: pick n-th match from the query result"':
+        - /url: "#css-pick-n-th-match-from-the-query-result"
+        - text: "#"
+    - img
+    - text: note
+    - paragraph: It is usually possible to distinguish elements by some attribute or text content, which is more resilient to page changes.
+    - paragraph: "Sometimes page contains a number of similar elements, and it is hard to select a particular one. For example:"
+    - code: <section> <button>Buy</button> </section> <article> <div> <button>Buy</button> </div> </article> <div> <div> <button>Buy</button> </div> </div>
+    - button "Copy code to clipboard"
+    - paragraph:
+      - text: In this case,
+      - code: :nth-match(:text("Buy"), 3)
+      - text: will select the third button from the snippet above. Note that index is one-based.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Click the third \"Buy\" button page.locator(\":nth-match(:text('Buy'), 3)\").click()"
+      - button "Copy code to clipboard"
+    - paragraph:
+      - code: :nth-match()
+      - text: is also useful to wait until a specified number of elements appear, using
+      - link "locator.wait_for()":
+        - /url: /python/docs/api/class-locator#locator-wait-for
+      - text: .
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Wait until all three buttons are visible page.locator(\":nth-match(:text('Buy'), 3)\").wait_for()"
+      - button "Copy code to clipboard"
+    - img
+    - text: note
+    - paragraph:
+      - text: Unlike
+      - link ":nth-child()":
+        - /url: https://developer.mozilla.org/en-US/docs/Web/CSS/:nth-child
+        - code: :nth-child()
+      - text: ", elements do not have to be siblings, they could be anywhere on the page. In the snippet above, all three buttons match"
+      - code: :text("Buy")
+      - text: selector, and
+      - code: :nth-match()
+      - text: selects the third button.
+    - heading "N-th element locatorDirect link to N-th element locator" [level=2]:
+      - text: N-th element locator
+      - link "Direct link to N-th element locator":
+        - /url: "#n-th-element-locator"
+        - text: "#"
+    - paragraph:
+      - text: You can narrow down query to the n-th match using the
+      - code: nth=
+      - text: locator passing a zero-based index.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Click first button page.locator(\"button\").locator(\"nth=0\").click() # Click last button page.locator(\"button\").locator(\"nth=-1\").click()"
+      - button "Copy code to clipboard"
+    - heading "Parent element locatorDirect link to Parent element locator" [level=2]:
+      - text: Parent element locator
+      - link "Direct link to Parent element locator":
+        - /url: "#parent-element-locator"
+        - text: "#"
+    - paragraph:
+      - text: When you need to target a parent element of some other element, most of the time you should
+      - link "locator.filter()":
+        - /url: /python/docs/api/class-locator#locator-filter
+      - text: "by the child locator. For example, consider the following DOM structure:"
+    - code: <li><label>Hello</label></li> <li><label>World</label></li>
+    - button "Copy code to clipboard"
+    - paragraph:
+      - text: If you'd like to target the parent
+      - code: <li>
+      - text: of a label with text
+      - code: "\"Hello\""
+      - text: ", using"
+      - link "locator.filter()":
+        - /url: /python/docs/api/class-locator#locator-filter
+      - text: "works best:"
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: child = page.get_by_text("Hello") parent = page.get_by_role("listitem").filter(has=child)
+      - button "Copy code to clipboard"
+    - paragraph:
+      - text: Alternatively, if you cannot find a suitable locator for the parent element, use
+      - code: xpath=..
+      - text: . Note that this method is not as reliable, because any changes to the DOM structure will break your tests. Prefer
+      - link "locator.filter()":
+        - /url: /python/docs/api/class-locator#locator-filter
+      - text: when possible.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: parent = page.get_by_text("Hello").locator('xpath=..')
+      - button "Copy code to clipboard"
+    - heading "XPath locatorDirect link to XPath locator" [level=2]:
+      - text: XPath locator
+      - link "Direct link to XPath locator":
+        - /url: "#xpath-locator"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend prioritizing
+      - link "user-visible locators":
+        - /url: /python/docs/locators#quick-guide
+      - text: like text or accessible role instead of using XPath that is tied to the implementation and easily break when the page changes.
+    - paragraph:
+      - text: XPath locators are equivalent to calling
+      - link "Document.evaluate":
+        - /url: https://developer.mozilla.org/en/docs/Web/API/Document/evaluate
+        - code: Document.evaluate
+      - text: .
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: page.locator("xpath=//button").click()
+      - button "Copy code to clipboard"
+    - img
+    - text: note
+    - paragraph:
+      - text: Any selector string starting with
+      - code: //
+      - text: or
+      - code: ..
+      - text: are assumed to be an xpath selector. For example, Playwright converts
+      - code: "'//html/body'"
+      - text: to
+      - code: "'xpath=//html/body'"
+      - text: .
+    - img
+    - text: note
+    - paragraph: XPath does not pierce shadow roots.
+    - heading "XPath unionDirect link to XPath union" [level=3]:
+      - text: XPath union
+      - link "Direct link to XPath union":
+        - /url: "#xpath-union"
+        - text: "#"
+    - paragraph:
+      - text: Pipe operator (
+      - code: "|"
+      - text: ) can be used to specify multiple selectors in XPath. It will match all elements that can be selected by one of the selectors in that list.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Waits for either confirmation dialog or load spinner. page.locator(\"//span[contains(@class, 'spinner__loading')]|//div[@id='confirmation']\").wait_for()"
+      - button "Toggle word wrap"
+      - button "Copy code to clipboard"
+    - heading "Label to form control retargetingDirect link to Label to form control retargeting" [level=2]:
+      - text: Label to form control retargeting
+      - link "Direct link to Label to form control retargeting":
+        - /url: "#label-to-form-control-retargeting"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend
+      - link "locating by label text":
+        - /url: /python/docs/locators#locate-by-label
+      - text: instead of relying to label-to-control retargeting.
+    - paragraph: Targeted input actions in Playwright automatically distinguish between labels and controls, so you can target the label to perform an action on the associated control.
+    - paragraph:
+      - text: "For example, consider the following DOM structure:"
+      - code: <label for="password">Password:</label><input id="password" type="password">
+      - text: . You can target the label by its "Password" text using
+      - link "page.get_by_text()":
+        - /url: /python/docs/api/class-page#page-get-by-text
+      - text: ". However, the following actions will be performed on the input instead of the label:"
+    - list:
+      - listitem:
+        - link "locator.click()":
+          - /url: /python/docs/api/class-locator#locator-click
+        - text: will click the label and automatically focus the input field;
+      - listitem:
+        - link "locator.fill()":
+          - /url: /python/docs/api/class-locator#locator-fill
+        - text: will fill the input field;
+      - listitem:
+        - link "locator.input_value()":
+          - /url: /python/docs/api/class-locator#locator-input-value
+        - text: will return the value of the input field;
+      - listitem:
+        - link "locator.select_text()":
+          - /url: /python/docs/api/class-locator#locator-select-text
+        - text: will select text in the input field;
+      - listitem:
+        - link "locator.set_input_files()":
+          - /url: /python/docs/api/class-locator#locator-set-input-files
+        - text: will set files for the input field with
+        - code: type=file
+        - text: ;
+      - listitem:
+        - link "locator.select_option()":
+          - /url: /python/docs/api/class-locator#locator-select-option
+        - text: will select an option from the select box.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Fill the input by targeting the label. page.get_by_text(\"Password\").fill(\"secret\")"
+      - button "Copy code to clipboard"
+    - paragraph:
+      - text: However, other methods will target the label itself, for example
+      - link "expect(locator).to_have_text()":
+        - /url: /python/docs/api/class-locatorassertions#locator-assertions-to-have-text
+      - text: will assert the text content of the label, not the input field.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Fill the input by targeting the label. expect(page.locator(\"label\")).to_have_text(\"Password\")"
+      - button "Copy code to clipboard"
+    - heading "Legacy text locatorDirect link to Legacy text locator" [level=2]:
+      - text: Legacy text locator
+      - link "Direct link to Legacy text locator":
+        - /url: "#legacy-text-locator"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend the modern
+      - link "text locator":
+        - /url: /python/docs/locators#get-by-text
+      - text: instead.
+    - paragraph: Legacy text locator matches elements that contain passed text.
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: page.locator("text=Log in").click()
+      - button "Copy code to clipboard"
+    - paragraph: "Legacy text locator has a few variations:"
+    - list:
+      - listitem:
+        - paragraph:
+          - code: text=Log in
+          - text: "- default matching is case-insensitive, trims whitespace and searches for a substring. For example,"
+          - code: text=Log
+          - text: matches
+          - code: <button>Log in</button>
+          - text: .
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("text=Log in").click()
+          - button "Copy code to clipboard"
+      - listitem:
+        - paragraph:
+          - code: text="Log in"
+          - text: "- text body can be escaped with single or double quotes to search for a text node with exact content after trimming whitespace."
+        - paragraph:
+          - text: For example,
+          - code: text="Log"
+          - text: does not match
+          - code: <button>Log in</button>
+          - text: because
+          - code: <button>
+          - text: contains a single text node
+          - code: "\"Log in\""
+          - text: that is not equal to
+          - code: "\"Log\""
+          - text: . However,
+          - code: text="Log"
+          - text: matches
+          - code: <button> Log <span>in</span></button>
+          - text: ", because"
+          - code: <button>
+          - text: contains a text node
+          - code: "\" Log \""
+          - text: . This exact mode implies case-sensitive matching, so
+          - code: text="Download"
+          - text: will not match
+          - code: <button>download</button>
+          - text: .
+        - paragraph:
+          - text: Quoted body follows the usual escaping rules, e.g. use
+          - code: \"
+          - text: "to escape double quote in a double-quoted string:"
+          - code: text="foo\"bar"
+          - text: .
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("text='Log in'").click()
+          - button "Copy code to clipboard"
+      - listitem:
+        - paragraph:
+          - code: /Log\s*in/i
+          - text: "- body can be a"
+          - link "JavaScript-like regex":
+            - /url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp
+          - text: wrapped in
+          - code: /
+          - text: symbols. For example,
+          - code: text=/Log\s*in/i
+          - text: matches
+          - code: <button>Login</button>
+          - text: and
+          - code: <button>log IN</button>
+          - text: .
+        - tablist:
+          - tab "Sync" [selected]
+          - tab "Async"
+        - tabpanel:
+          - code: page.locator("text=/Log\s*in/i").click()
+          - button "Copy code to clipboard"
+    - img
+    - text: note
+    - paragraph:
+      - text: String selectors starting and ending with a quote (either
+      - code: "\""
+      - text: or
+      - code: "'"
+      - text: ) are assumed to be a legacy text locators. For example,
+      - code: "\"Log in\""
+      - text: is converted to
+      - code: text="Log in"
+      - text: internally.
+    - img
+    - text: note
+    - paragraph: Matching always normalizes whitespace. For example, it turns multiple spaces into one, turns line breaks into spaces and ignores leading and trailing whitespace.
+    - img
+    - text: note
+    - paragraph:
+      - text: Input elements of the type
+      - code: button
+      - text: and
+      - code: submit
+      - text: are matched by their
+      - code: value
+      - text: instead of text content. For example,
+      - code: text=Log in
+      - text: matches
+      - code: <input type=button value="Log in">
+      - text: .
+    - heading "id, data-testid, data-test-id, data-test selectorsDirect link to id, data-testid, data-test-id, data-test selectors" [level=2]:
+      - text: id, data-testid, data-test-id, data-test selectors
+      - link "Direct link to id, data-testid, data-test-id, data-test selectors":
+        - /url: "#id-data-testid-data-test-id-data-test-selectors"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend
+      - link "locating by test id":
+        - /url: /python/docs/locators#locate-by-test-id
+      - text: instead.
+    - paragraph: "Playwright supports shorthand for selecting elements using certain attributes. Currently, only the following attributes are supported:"
+    - list:
+      - listitem:
+        - code: id
+      - listitem:
+        - code: data-testid
+      - listitem:
+        - code: data-test-id
+      - listitem:
+        - code: data-test
+    - tablist:
+      - tab "Sync" [selected]
+      - tab "Async"
+    - tabpanel:
+      - code: "# Fill an input with the id \"username\" page.locator('id=username').fill('value') # Click an element with data-test-id \"submit\" page.locator('data-test-id=submit').click()"
+      - button "Copy code to clipboard"
+    - img
+    - text: note
+    - paragraph:
+      - text: Attribute selectors are not CSS selectors, so anything CSS-specific like
+      - code: :enabled
+      - text: is not supported. For more features, use a proper
+      - link "css":
+        - /url: "#css-locator"
+      - text: selector, e.g.
+      - code: css=[data-test="login"]:enabled
+      - text: .
+    - heading "Chaining selectorsDirect link to Chaining selectors" [level=2]:
+      - text: Chaining selectors
+      - link "Direct link to Chaining selectors":
+        - /url: "#chaining-selectors"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend
+      - link "chaining locators":
+        - /url: /python/docs/locators#matching-inside-a-locator
+      - text: instead.
+    - paragraph:
+      - text: Selectors defined as
+      - code: engine=body
+      - text: or in short-form can be combined with the
+      - code: ">>"
+      - text: token, e.g.
+      - code: selector1 >> selector2 >> selectors3
+      - text: . When selectors are chained, the next one is queried relative to the previous one's result.
+    - paragraph: For example,
+    - code: css=article >> css=.bar > .baz >> css=span[attr=value]
+    - button "Copy code to clipboard"
+    - paragraph: is equivalent to
+    - code: document .querySelector('article') .querySelector('.bar > .baz') .querySelector('span[attr=value]');
+    - button "Copy code to clipboard"
+    - paragraph:
+      - text: If a selector needs to include
+      - code: ">>"
+      - text: in the body, it should be escaped inside a string to not be confused with chaining separator, e.g.
+      - code: text="some >> text"
+      - text: .
+    - heading "Intermediate matchesDirect link to Intermediate matches" [level=3]:
+      - text: Intermediate matches
+      - link "Direct link to Intermediate matches":
+        - /url: "#intermediate-matches"
+        - text: "#"
+    - img
+    - text: warning
+    - paragraph:
+      - text: We recommend
+      - link "filtering by another locator":
+        - /url: /python/docs/locators#filter-by-childdescendant
+      - text: to locate elements that contain other elements.
+    - paragraph:
+      - text: By default, chained selectors resolve to an element queried by the last selector. A selector can be prefixed with
+      - code: "*"
+      - text: to capture elements that are queried by an intermediate selector.
+    - paragraph:
+      - text: For example,
+      - code: css=article >> text=Hello
+      - text: captures the element with the text
+      - code: Hello
+      - text: ", and"
+      - code: "*css=article >> text=Hello"
+      - text: (note the
+      - code: "*"
+      - text: ) captures the
+      - code: article
+      - text: element that contains some element with the text
+      - code: Hello
+      - text: .
+  - navigation "Docs pages":
+    - link "Previous « Network":
+      - /url: /python/docs/network
+    - link "Next Pages »":
+      - /url: /python/docs/pages
+  - list:
+    - listitem:
+      - link "Introduction":
+        - /url: "#introduction"
+    - listitem:
+      - link "CSS locator":
+        - /url: "#css-locator"
+      - list:
+        - listitem:
+          - 'link "CSS: matching by text"':
+            - /url: "#css-matching-by-text"
+        - listitem:
+          - 'link "CSS: matching only visible elements"':
+            - /url: "#css-matching-only-visible-elements"
+        - listitem:
+          - 'link "CSS: elements that contain other elements"':
+            - /url: "#css-elements-that-contain-other-elements"
+        - listitem:
+          - 'link "CSS: elements matching one of the conditions"':
+            - /url: "#css-elements-matching-one-of-the-conditions"
+        - listitem:
+          - 'link "CSS: matching elements based on layout"':
+            - /url: "#css-matching-elements-based-on-layout"
+        - listitem:
+          - 'link "CSS: pick n-th match from the query result"':
+            - /url: "#css-pick-n-th-match-from-the-query-result"
+    - listitem:
+      - link "N-th element locator":
+        - /url: "#n-th-element-locator"
+    - listitem:
+      - link "Parent element locator":
+        - /url: "#parent-element-locator"
+    - listitem:
+      - link "XPath locator":
+        - /url: "#xpath-locator"
+      - list:
+        - listitem:
+          - link "XPath union":
+            - /url: "#xpath-union"
+    - listitem:
+      - link "Label to form control retargeting":
+        - /url: "#label-to-form-control-retargeting"
+    - listitem:
+      - link "Legacy text locator":
+        - /url: "#legacy-text-locator"
+    - listitem:
+      - link "id, data-testid, data-test-id, data-test selectors":
+        - /url: "#id-data-testid-data-test-id-data-test-selectors"
+    - listitem:
+      - link "Chaining selectors":
+        - /url: "#chaining-selectors"
+      - list:
+        - listitem:
+          - link "Intermediate matches":
+            - /url: "#intermediate-matches"
+- contentinfo:
+  - text: Learn
+  - list:
+    - listitem:
+      - link "Getting started":
+        - /url: /python/docs/intro
+    - listitem:
+      - link "Playwright Training(opens in new tab)":
+        - /url: https://learn.microsoft.com/en-us/training/modules/build-with-playwright/
+        - text: Playwright Training
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Learn Videos":
+        - /url: /python/community/learn-videos
+    - listitem:
+      - link "Feature Videos":
+        - /url: /python/community/feature-videos
+  - text: Community
+  - list:
+    - listitem:
+      - link "Stack Overflow(opens in new tab)":
+        - /url: https://stackoverflow.com/questions/tagged/playwright
+        - text: Stack Overflow
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Discord(opens in new tab)":
+        - /url: https://aka.ms/playwright/discord
+        - text: Discord
+        - img "(opens in new tab)"
+    - listitem:
+      - link "X(opens in new tab)":
+        - /url: https://x.com/playwrightweb
+        - text: X
+        - img "(opens in new tab)"
+    - listitem:
+      - link "LinkedIn(opens in new tab)":
+        - /url: https://www.linkedin.com/company/playwrightweb
+        - text: LinkedIn
+        - img "(opens in new tab)"
+  - text: More
+  - list:
+    - listitem:
+      - link "GitHub(opens in new tab)":
+        - /url: https://github.com/microsoft/playwright-python
+        - text: GitHub
+        - img "(opens in new tab)"
+    - listitem:
+      - link "YouTube(opens in new tab)":
+        - /url: https://www.youtube.com/channel/UC46Zj8pDH5tDosqm1gd7WTg
+        - text: YouTube
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Blog(opens in new tab)":
+        - /url: https://dev.to/playwright
+        - text: Blog
+        - img "(opens in new tab)"
+    - listitem:
+      - link "Ambassadors":
+        - /url: /python/community/ambassadors
+    - listitem:
+      - link "Microsoft Privacy Statement(opens in new tab)":
+        - /url: https://go.microsoft.com/fwlink/?LinkId=521839
+        - text: Microsoft Privacy Statement
+        - img "(opens in new tab)"
+  - text: Copyright © 2026 Microsoft
+exit code: 1
