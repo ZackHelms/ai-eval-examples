@@ -15,7 +15,7 @@ Reply with exactly one JSON object and nothing else:
 - Locators are strict: an action or assertion on a locator that matches more than one element fails, unless `.first`, `.last` or `.nth(i)` picks one. `.first` picks the first match in document order.
 - The aria snapshot in the evidence lists the page's elements in document order, each as `role "accessible name"`, indented under its container. It shows the page at the moment the broken script failed, at line {{fails_at}} of its input; steps after that point may run on another page.
 - The reference fix passes on the live site, so each of its locators matches exactly one element there.
-- Same element, by deduction: suppose the reference's element also satisfies the model's locator (the same role, and the element's name, from the evidence or else from the reference's locator, satisfies the model's string or pattern). If the model's script passed with no `.first`, `.last` or `.nth()` on that locator, the locator matched exactly one element, so it matched the reference's.
+- Same element, by deduction: suppose the reference's element also satisfies the model's locator (the same role, and the element's name, from the evidence or else from the reference's locator, satisfies the model's string or pattern). If the model's script passed with no `.first`, `.last` or `.nth()` on that locator, the locator matched exactly one element, so it matched the reference's. The deduction says which element the locator matched on that run, not that the locator is specific: a string or pattern that any name would satisfy could still match other elements, so it doesn't target the reference's element alone.
 
 ## The CD's standard for new waits and setup changes
 
