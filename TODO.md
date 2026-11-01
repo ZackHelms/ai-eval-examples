@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **grader-01c: cases 02–06** — oversee run of
+  `.claude/plans/grader-01c.cases.md`, started 2026-11-01 by
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01c.cases.md`
+  on branch `worktree-oversee+grader-01c`. No commits landed yet.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
