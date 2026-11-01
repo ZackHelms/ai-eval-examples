@@ -1403,3 +1403,78 @@ def test_escalate_retargeted_blocked_action_is_one_zero_retargeted():
     assert [f.tag for f in findings] == [TAG_RETARGETED], findings
     assert findings[0].severity == SEVERITY_ZERO
     assert findings[0].line == line_of(fix, '"Menu"')
+
+
+# The blocked step is found by position: the input is the reference plus it.
+OTHER_HEADING = 'await expect(page.get_by_role("heading", name="Welcome")).to_be_visible()'
+
+
+def zero_lines(findings) -> list[int]:
+    return [f.line for f in findings if f.tag == TAG_RETARGETED and f.severity == SEVERITY_ZERO]
+
+
+def test_escalate_retargeted_blocked_assertion_with_a_new_matcher_is_one_zero_retargeted():
+    fix = with_extra(RETARGETED_ASSERTION.replace("to_be_visible", "to_be_attached"))
+    findings = escalate(fix)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_retargeted_blocked_action_like_the_next_step_is_one_zero_retargeted():
+    blocked_action = 'await page.get_by_role("link", name="Missing").click()'
+    broken_input = with_extra(blocked_action, before=START_CLICK)
+    fix = with_extra(blocked_action.replace('"Missing"', '"Menu"'), before=START_CLICK)
+    findings = escalate(fix, broken_input)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Menu"')
+    assert TAG_CHANGED_JOURNEY not in {f.tag for f in findings}
+
+
+def test_escalate_retargeted_blocked_assertion_moved_to_another_gap_is_one_zero_retargeted():
+    fix = with_extra(RETARGETED_ASSERTION, before=START_CLICK)
+    findings = escalate(fix)
+    assert [(f.tag, f.severity) for f in findings] == [(TAG_RETARGETED, SEVERITY_ZERO)], findings
+    assert findings[0].line == line_of(fix, '"Welcome"')
+
+
+def test_escalate_retargeted_blocked_assertion_beside_a_weakened_check_is_tagged():
+    blocked = 'await expect(page.get_by_role("heading", name="Missing")).to_have_text("Hi")'
+    broken_input = with_extra(blocked, before=START_CLICK)
+    start_check = 'name="Start")).to_be_visible()'
+    fix = with_extra(blocked.replace('"Missing"', '"Welcome"'), before=START_CLICK).replace(
+        start_check, start_check.replace("to_be_visible", "to_be_attached"), 1
+    )
+    findings = escalate(fix, broken_input)
+    assert TAG_WEAKENED_CHECK in {f.tag for f in findings}, findings
+    # The weakened replacement isn't a reference assertion either, so it is
+    # tagged too (the plan accepts this: that trial already scores 0).
+    assert zero_lines(findings) == [line_of(fix, "to_be_attached"), line_of(fix, '"Welcome"')]
+
+
+def test_escalate_blocked_assertion_kept_plus_an_extra_with_its_matcher_has_no_zero():
+    fix = with_extra(BLOCKED_ASSERTION + "\n" + OTHER_HEADING)
+    findings = escalate(fix)
+    assert [f.tag for f in findings] == [TAG_ADDED_ASSERTION, TAG_ADDED_ASSERTION], findings
+    assert not any(f.severity == SEVERITY_ZERO for f in findings)
+
+
+def test_escalate_blocked_assertion_removed_plus_an_unrelated_extra_is_only_added_assertion():
+    extra = 'await expect(page.get_by_role("link", name="Start")).to_be_enabled()'
+    fix = with_extra(extra, before=START_CLICK)
+    findings = escalate(fix)
+    assert [f.tag for f in findings] == [TAG_ADDED_ASSERTION], findings
+    assert findings[0].line == line_of(fix, "to_be_enabled")
+
+
+def test_escalate_blocked_action_removed_has_no_findings():
+    blocked_action = 'await page.get_by_role("button", name="Missing").hover()'
+    broken_input = with_extra(blocked_action, before=START_CLICK)
+    assert escalate(REFERENCE, broken_input) == []
+
+
+def test_escalate_input_with_two_extra_steps_has_no_blocked_step_zero():
+    second = OTHER_HEADING.replace('"Welcome"', '"Other"')
+    broken_input = with_extra(BLOCKED_ASSERTION + "\n" + second)
+    fix = with_extra(RETARGETED_ASSERTION)
+    findings = escalate(fix, broken_input)
+    assert not any(f.severity == SEVERITY_ZERO for f in findings), findings

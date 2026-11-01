@@ -32,8 +32,8 @@ def compare_journey(reference: list[Step], fix: list[Step]) -> list[Finding]:
     Lines refer to the fix, except where the fix lacks the step (see the
     ``detail`` of ``weakened-check``, which names the reference line).
     """
-    ref_path, ref_gaps = _path_and_gaps(reference)
-    fix_path, fix_gaps = _path_and_gaps(fix)
+    ref_path, ref_gaps = path_and_gaps(reference)
+    fix_path, fix_gaps = path_and_gaps(fix)
     findings: list[Finding] = []
     divergence = _first_divergence(ref_path, fix_path)
     if divergence is not None:
@@ -49,7 +49,7 @@ def compare_journey(reference: list[Step], fix: list[Step]) -> list[Finding]:
     return findings
 
 
-def _path_and_gaps(steps: list[Step]) -> tuple[list[Step], list[list[Step]]]:
+def path_and_gaps(steps: list[Step]) -> tuple[list[Step], list[list[Step]]]:
     """Split steps into path steps and the assertions of each gap.
 
     Gap 0 is before the first path step; gap k is after path step k, so

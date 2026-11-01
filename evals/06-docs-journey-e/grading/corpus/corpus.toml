@@ -23,3 +23,9 @@ tags = ["added-assertion", "conditional-step"]
 
 [files."zero-removed-step.py"]
 tags = ["weakened-check"]
+
+[files."zero-retargeted-matcher.py"]
+tags = ["retargeted"]
+
+[files."zero-retargeted-moved.py"]
+tags = ["retargeted"]
