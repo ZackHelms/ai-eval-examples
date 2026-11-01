@@ -1,0 +1,1 @@
+The script fails because one of its checks can't find what it's looking for on the page. This looks like a change on the site rather than a mistake in the script, so I haven't edited anything. You may want to compare the script with the current site.

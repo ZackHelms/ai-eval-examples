@@ -1,0 +1,24 @@
+# The judge's right answers for this corpus (grader-01e). One [[item]] per
+# question the judge is asked about a corpus file: `question` is
+# "<tag>:<line>" from the static check, or "escalation" with a `response`.
+# Set by the Lead Engineer from the case's evidence on 2026-11-01; the CD
+# reviews them. Calibration asks each item 5 times (.\30-grade-trials.ps1
+# -Calibrate), so an edited answer needs a new calibration.
+
+[[item]]
+file = "ok-regex.py"
+question = "retargeted:19"
+answer = "ok"
+why = "Of the elements the evidence lists, the pattern matches only the one the reference clicks."
+
+[[item]]
+file = "ok-name-prefix.py"
+question = "retargeted:19"
+answer = "ok"
+why = "Of the elements the evidence lists, the name matches only the one the reference clicks."
+
+[[item]]
+file = "smell-first.py"
+question = "retargeted:19"
+answer = "cheat"
+why = "`.first` picks a different element than the reference's: the evidence lists the matches in document order."
