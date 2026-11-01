@@ -1,19 +1,23 @@
-"""Command line: ``python -m scriptfix grade ...``, ``report``, ``make-case`` and ``run``.
+"""Command line: ``python -m scriptfix grade ...``, ``calibrate``, ``report``, ``make-case`` and ``run``.
 
-Wiring only: argument parsing here, the work in ``grade.py``, ``report.py``,
-``makecase.py`` and ``run.py``. Exit codes: 0 success, 1 a control replay was
-surprising (the batch is void), a make-case capture was (nothing written), or
-a trial run hit a harness problem (or the self-test failed), 2 usage errors.
+Wiring only: argument parsing here, the work in ``grade.py``, ``calibrate.py``,
+``report.py``, ``makecase.py`` and ``run.py``. Exit codes: 0 success, 1 a
+control replay was surprising (the batch is void), a make-case capture was
+(nothing written), a trial run hit a harness problem (or the self-test
+failed) or a calibration missed, erred or ran out of budget, 2 usage errors.
 """
 
 from __future__ import annotations
 
 import argparse
+import functools
 import sys
 from pathlib import Path
 
 from scriptfix import RUBRIC, __version__
+from scriptfix.calibrate import CALIBRATION_SAMPLES, DEFAULT_MAX_TOTAL_USD, calibrate
 from scriptfix.grade import grade, parse_runs
+from scriptfix.judgeprompt import JUDGE_DIR, ask_claude
 from scriptfix.makecase import make_case
 from scriptfix.report import REPO_ROOT, report
 from scriptfix.run import (
@@ -59,11 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Exit codes: 0 ok, 1 a control replay or a make-case capture was "
-            "surprising, or a trial run hit a harness problem (or the self-test "
-            "failed), 2 usage error."
+            "surprising, a trial run hit a harness problem (or the self-test "
+            "failed) or a calibration did not pass, 2 usage error."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{grade,report,make-case,run}", required=True)
+    sub = parser.add_subparsers(dest="command", metavar="{grade,calibrate,report,make-case,run}", required=True)
 
     grader = sub.add_parser(
         "grade",
@@ -94,6 +98,37 @@ def build_parser() -> argparse.ArgumentParser:
     grader.add_argument("--context", default="none", help="subject context files to record for runs without a <NN>-run<N>.subject.json sidecar (default: none)")
     grader.add_argument("--tools", default="edit-only", help="subject tool profile to record for runs without a <NN>-run<N>.subject.json sidecar (default: edit-only)")
     grader.add_argument("--timeout", type=int, default=120, help="seconds before a replay is killed (default: 120)")
+
+    calibrator = sub.add_parser(
+        "calibrate",
+        help="ask the judge every labeled corpus item and check it agrees",
+        description=(
+            "Calibrate the judge: ask it every item labeled in the cases' "
+            "grading/corpus/judge.toml files, SAMPLES times each, one call at a time, "
+            "with the prompt a real trial would get. It passes only when every answer "
+            "equals its label (unsure is a miss). A full pass with at least "
+            f"{CALIBRATION_SAMPLES} samples is recorded in the judge folder's calibration.json. "
+            "Never reads or writes a judge.jsonl. Each call costs money; --dry-run asks nothing."
+        ),
+        epilog=(
+            "Prints ITEM=<id> LABEL=<answer> GOT=<answers> OK|MISS per item, then CALLS=, "
+            "COST_USD=, CALIBRATION=pass|fail|error|budget and RECORDED=<path>|no. "
+            "Exit codes: 0 a pass or a dry run, 1 a miss, an error or the budget, 2 usage error."
+        ),
+    )
+    calibrator.add_argument("--samples", type=int, default=CALIBRATION_SAMPLES, help=f"times to ask each item, at least 1 (default: {CALIBRATION_SAMPLES}; fewer is never recorded)")
+    calibrator.add_argument(
+        "--items",
+        action="append",
+        default=None,
+        metavar="ID",
+        help="ask only this item id (repeatable, or comma-separated); the result is never recorded",
+    )
+    calibrator.add_argument("--max-total-usd", type=float, default=DEFAULT_MAX_TOTAL_USD, help=f"stop with CALIBRATION=budget once the running cost passes this, above 0 (default: {DEFAULT_MAX_TOTAL_USD})")
+    calibrator.add_argument("--log", type=Path, default=None, help="append one JSON line per answered sample (answer, quote, reason, cost) to this file")
+    calibrator.add_argument("--claude", type=Path, default=None, help="the claude executable (default: claude on PATH; not needed with --dry-run)")
+    calibrator.add_argument("--dry-run", action="store_true", help="print each item's prompt length and the number of calls; ask nothing and write nothing")
+    calibrator.add_argument("--prompts-dir", type=Path, default=None, help="with --dry-run, write each prompt to <dir>/<n>.txt, numbered in item id order")
 
     reporter = sub.add_parser(
         "report",
@@ -243,6 +278,37 @@ def _run_command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> i
         return 2  # parser.error exits; keeps the return type honest
 
 
+def _calibrate_command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """The ``calibrate`` subcommand: validate the arguments, then calibrate (or dry-run)."""
+    if args.samples < 1:
+        parser.error("--samples must be at least 1")
+    if not args.max_total_usd > 0:
+        parser.error("--max-total-usd must be above 0")
+    only = None
+    if args.items is not None:
+        only = [part.strip() for value in args.items for part in value.split(",") if part.strip()]
+        if not only:
+            parser.error("--items needs at least one item id")
+    try:
+        ask_fn = None
+        if not args.dry_run:  # a dry run needs no claude
+            ask_fn = functools.partial(ask_claude, claude_cmd=[str(resolve_claude(args.claude))])
+        return calibrate(
+            ask_fn=ask_fn,
+            repo_root=REPO_ROOT,
+            judge_dir=JUDGE_DIR,
+            samples=args.samples,
+            only=only,
+            max_total_usd=args.max_total_usd,
+            log=args.log,
+            dry_run=args.dry_run,
+            prompts_dir=args.prompts_dir,
+        )
+    except ValueError as exc:  # an unknown item id, a missing claude, a broken label
+        parser.error(str(exc))
+        return 2  # parser.error exits; keeps the return type honest
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the command line; returns the process exit code."""
     # The console may not be UTF-8 and the output can contain characters like
@@ -295,6 +361,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _run_command(parser, args)
+
+    if args.command == "calibrate":
+        return _calibrate_command(parser, args)
 
     for case in args.case or []:
         if not case.is_dir():

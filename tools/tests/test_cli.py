@@ -144,7 +144,7 @@ def test_run_help_lists_its_options(capsys: pytest.CaptureFixture[str]) -> None:
         assert option in out
     with pytest.raises(SystemExit):
         cli.main(["-h"])
-    assert "{grade,report,make-case,run}" in capsys.readouterr().out
+    assert "{grade,calibrate,report,make-case,run}" in capsys.readouterr().out
 
 
 class RunWorld:
