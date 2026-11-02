@@ -5,6 +5,10 @@ Implements the plan's journey rules over ``steps.extract_steps`` output:
 1. the ``(kind, name)`` sequence of path steps (navigations, actions,
    markers) must match, else one ``changed-journey`` and rules 2-3 are
    skipped;
+1b. when the sequences match, an aligned path step that is another
+   reference step (same kind, name, target and values, a different position)
+   is a reordered step: one ``changed-journey`` at the first such step, and
+   rules 2-3 are skipped;
 2. aligned path steps with a different target or values are ``retargeted``;
 3. every reference assertion needs a fix assertion in the same gap between
    path steps with the same matcher (``weakened-check`` otherwise); a
@@ -36,8 +40,11 @@ def compare_journey(reference: list[Step], fix: list[Step]) -> list[Finding]:
     fix_path, fix_gaps = path_and_gaps(fix)
     findings: list[Finding] = []
     divergence = _first_divergence(ref_path, fix_path)
+    reordered = _reordered(ref_path, fix_path) if divergence is None else None
     if divergence is not None:
         findings.append(_changed_journey(ref_path, fix_path, divergence))
+    elif reordered is not None:
+        findings.append(_reordered_journey(ref_path, fix_path, *reordered))
     else:
         findings.extend(_compare_path_steps(ref_path, fix_path))
         for gap, (ref_asserts, fix_asserts) in enumerate(zip(ref_gaps, fix_gaps)):
@@ -75,6 +82,35 @@ def _first_divergence(ref_path: list[Step], fix_path: list[Step]) -> int | None:
     if len(ref_path) != len(fix_path):
         return min(len(ref_path), len(fix_path))
     return None
+
+
+def _reordered(ref_path: list[Step], fix_path: list[Step]) -> tuple[int, int] | None:
+    """``(k, j)`` for the first aligned fix step that is another reference step.
+
+    Aligned path steps have the same ``(kind, name)``; step ``k`` is reordered
+    when its target or values differ from reference step ``k`` and equal
+    reference step ``j``'s (``j != k``, same kind and name). Options are
+    ignored, as in rule 2.
+    """
+
+    def full(step: Step) -> tuple:
+        return (step.kind, step.name, step.target, step.values)
+
+    for k, (ref_step, fix_step) in enumerate(zip(ref_path, fix_path)):
+        if (ref_step.target, ref_step.values) == (fix_step.target, fix_step.values):
+            continue
+        for j, other in enumerate(ref_path):
+            if j != k and full(other) == full(fix_step):
+                return k, j
+    return None
+
+
+def _reordered_journey(ref_path: list[Step], fix_path: list[Step], k: int, j: int) -> Finding:
+    detail = (
+        f"path step {k + 1}: the fix's {_describe(fix_path[k])} is the reference's "
+        f"path step {j + 1} (reference line {ref_path[j].line}), a reordered step"
+    )
+    return Finding(TAG_CHANGED_JOURNEY, SEVERITY_ZERO, fix_path[k].line, detail)
 
 
 def _describe(step: Step) -> str:

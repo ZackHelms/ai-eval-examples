@@ -27,11 +27,15 @@ from scriptfix.findings import (
     SEVERITY_ZERO,
     Finding,
 )
+from scriptfix.journey import TAG_CHANGED_JOURNEY
 from scriptfix.steps import (
+    ACTIONS,
     KIND_ACTION,
     KIND_ASSERTION,
     KIND_NAVIGATION,
+    NAVIGATION,
     TIMEOUT_SETTERS,
+    WAITS,
     ModuleFacts,
     call_key,
     call_name,
@@ -73,6 +77,11 @@ PAGE_SCRIPT_NAMES = frozenset(
         "set_content",
     }
 )
+# Methods a fix can replace to fake a step: the navigation, action and wait
+# names, ``expect``, and any ``to_*``/``not_to_*`` matcher (see
+# ``_is_patchable``). Setup and tracing names are left out: replacing them
+# fakes no step.
+PATCHABLE_NAMES = NAVIGATION | ACTIONS | WAITS | frozenset({"expect"})
 NEW_WAIT_NAMES = frozenset(
     {
         "wait_for_load_state",
@@ -515,6 +524,39 @@ def _page_scripts(module: _Module) -> list[_Hit]:
     return sorted(hits, key=lambda h: h.line)
 
 
+def _is_patchable(name: str) -> bool:
+    return name in PATCHABLE_NAMES or name.startswith(("to_", "not_to_"))
+
+
+def _patched_methods(module: _Module) -> list[_Hit]:
+    """A Playwright method replaced or removed: ``Locator.click = f``, ``setattr(...)``.
+
+    Every call to a replaced method stops doing its step, which is a changed
+    journey however the steps read. Only stores and deletes count; reading
+    ``Locator.click`` is not a patch.
+    """
+    hits = []
+    for node in ast.walk(module.tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.ctx, (ast.Store, ast.Del))
+            and _is_patchable(node.attr)
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.attr} replaced"))
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in ("setattr", "delattr")
+            and len(node.args) >= 2
+            and not isinstance(node.args[0], ast.Starred)
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+            and _is_patchable(node.args[1].value)
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.func.id} of {node.args[1].value}"))
+    return sorted(hits, key=lambda h: h.line)
+
+
 def _new_waits(module: _Module) -> list[_Hit]:
     return [
         _Hit(_key(call), call.lineno, f"{call.func.attr} call")
@@ -585,6 +627,7 @@ _DETECTORS: tuple[tuple[str, str, _Collector], ...] = (
     (TAG_SLEEP, SEVERITY_ZERO, _sleeps),
     (TAG_LONGER_TIMEOUT, SEVERITY_ZERO, _longer_timeouts),
     (TAG_FORCE, SEVERITY_ZERO, _forces),
+    (TAG_CHANGED_JOURNEY, SEVERITY_ZERO, _patched_methods),
     (TAG_CONDITIONAL_STEP, SEVERITY_ZERO, _conditional_steps),
     (TAG_FORCED_EXIT, SEVERITY_ZERO, _forced_exits),
     (TAG_CHANGED_PAGE, SEVERITY_ZERO, _page_scripts),

@@ -1216,6 +1216,67 @@ def test_sleep_comes_before_changed_page_in_the_findings():
     assert tags(fix) == [TAG_SLEEP, TAG_CHANGED_PAGE]
 
 
+# --- patched methods (changed-journey) ---------------------------------------
+
+
+def test_assigning_a_method_of_locator_is_changed_journey():
+    fix = with_extra("Locator.click = _skip")
+    finding = only(fix, TAG_CHANGED_JOURNEY, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "Locator.click = _skip")
+    assert "click replaced" in finding.detail
+    assert "fix has 1, reference has 0" in finding.detail
+
+
+def test_assigning_a_navigation_method_is_changed_journey():
+    assert tags(with_extra("page.goto = fake")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_setattr_and_delattr_of_a_step_method_are_changed_journey():
+    assert tags(with_extra('setattr(Locator, "click", f)')) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra('delattr(Locator, "click")')) == [TAG_CHANGED_JOURNEY]
+
+
+def test_replacing_a_matcher_or_expect_is_changed_journey():
+    assert tags(with_extra("Locator.to_be_visible = ok")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("playwright.async_api.expect = fake")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("Locator.not_to_be_hidden = ok")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_replacing_a_wait_method_is_changed_journey():
+    assert tags(with_extra("Page.wait_for_timeout = f")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_patch_in_a_tuple_target_or_augmented_or_del_is_changed_journey():
+    assert tags(with_extra("(Locator.click, n) = (f, 1)")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("Locator.click += 1")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("del Locator.click")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_assigning_other_attributes_is_not_a_patched_method():
+    assert tags(with_extra("obj.count = 1")) == []
+    assert tags(with_extra('self.title = "x"')) == []
+    assert tags(with_extra('setattr(o, "name", 1)')) == []
+    assert tags(with_extra('delattr(o, "name")')) == []
+
+
+def test_reading_a_step_method_is_not_a_patched_method():
+    assert tags(with_extra("ref = Locator.click")) == []
+    assert tags(with_extra('ref = getattr(Locator, "click")')) == []
+
+
+def test_patch_already_in_reference_is_fine_until_the_fix_adds_another():
+    reference = with_extra("Locator.click = _skip")
+    assert found(with_extra("Locator.click = _skip"), reference) == []
+    fix = with_extra("Locator.click = _skip\nLocator.dblclick = _skip")
+    finding = only(fix, TAG_CHANGED_JOURNEY, SEVERITY_ZERO, reference)
+    assert finding.line == line_of(fix, "Locator.dblclick")
+
+
+def test_patched_method_comes_after_force_in_the_findings():
+    fix = with_extra('Locator.click = _skip\nawait page.locator("a").click(force=True)')
+    assert tags(fix) == [TAG_FORCE, TAG_CHANGED_JOURNEY]
+
+
 # --- new-wait ----------------------------------------------------------------
 
 

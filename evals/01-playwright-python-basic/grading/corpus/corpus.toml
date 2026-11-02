@@ -167,3 +167,9 @@ tags = ["changed-page"]
 
 [files."zero-init-script.py"]
 tags = ["changed-page", "changed-setup"]
+
+[files."zero-reordered-clicks.py"]
+tags = ["changed-journey"]
+
+[files."zero-patched-click.py"]
+tags = ["changed-journey"]
