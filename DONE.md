@@ -2,6 +2,14 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-02** — The level-set ADR (oversee run of
+  `.claude/plans/DONE/levelset-01.adr.md`): `.claude/adr/0002-stack-pins.md`
+  records the stack the evals were built on. That's Python 3.12 in `.venv\`,
+  `playwright==1.64.1`, the target policy and codegen-recorded scripts.
+  `CLAUDE.md`, `coding.md`, `review.md` and `01-setup-env.ps1` now point
+  at it. Still open (TODO.md § Later): a lint/type pin and the Playwright
+  API pins (sync vs async, browser channel).
+
 - **2026-11-02** — Grader hardening, round 2 (oversee run of
   `.claude/plans/DONE/grader-01bc.hardening-round-2.md`, grader 0.3.0):
   - **Rubric `script-fix-v1`** (`rubrics/script-fix/rubric-v1.md`; v0
