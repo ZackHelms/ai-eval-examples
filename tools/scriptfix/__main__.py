@@ -1,12 +1,13 @@
-"""Command line: ``python -m scriptfix grade ...``, ``judge``, ``calibrate``, ``report``, ``make-case`` and ``run``.
+"""Command line: ``python -m scriptfix grade ...``, ``regrade``, ``judge``, ``calibrate``, ``report``, ``make-case`` and ``run``.
 
-Wiring only: argument parsing here, the work in ``grade.py``, ``judge.py``,
-``calibrate.py``, ``report.py``, ``makecase.py`` and ``run.py``. Exit codes:
-0 success, 1 a control replay was surprising (the batch is void), a
-make-case capture was (nothing written), a trial run hit a harness problem
-(or the self-test failed), a judged trial erred, the judge is not
-calibrated, or a calibration missed, erred or ran out of budget, 2 usage
-errors (a bad ``reviews.toml`` included).
+Wiring only: argument parsing here, the work in ``grade.py``, ``regrade.py``,
+``judge.py``, ``calibrate.py``, ``report.py``, ``makecase.py`` and ``run.py``.
+Exit codes: 0 success, 1 a control replay was surprising (the batch is void),
+a regrade found a changed verdict or needs a replay, a make-case capture was
+surprising (nothing written), a trial run hit a harness problem (or the
+self-test failed), a judged trial erred, the judge is not calibrated, or a
+calibration missed, erred or ran out of budget, 2 usage errors (a bad
+``reviews.toml`` included).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from scriptfix.grade import grade, parse_runs
 from scriptfix.judge import NotCalibrated, judge_trials
 from scriptfix.judgeprompt import JUDGE_DIR, Answer, AskFn, ask_claude
 from scriptfix.makecase import make_case
+from scriptfix.regrade import regrade
 from scriptfix.report import REPO_ROOT, report
 from scriptfix.run import (
     CONTEXTS,
@@ -66,12 +68,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Exit codes: 0 ok, 1 a control replay or a make-case capture was "
-            "surprising, a trial run hit a harness problem (or the self-test "
+            "surprising, a regrade found a changed verdict or needs a replay, "
+            "a trial run hit a harness problem (or the self-test "
             "failed), a judged trial erred or the judge is not calibrated, or a "
             "calibration did not pass, 2 usage error."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{grade,judge,calibrate,report,make-case,run}", required=True)
+    sub = parser.add_subparsers(
+        dest="command", metavar="{grade,regrade,judge,calibrate,report,make-case,run}", required=True
+    )
 
     grader = sub.add_parser(
         "grade",
@@ -102,6 +107,59 @@ def build_parser() -> argparse.ArgumentParser:
     grader.add_argument("--context", default="none", help="subject context files to record for runs without a <NN>-run<N>.subject.json sidecar (default: none)")
     grader.add_argument("--tools", default="edit-only", help="subject tool profile to record for runs without a <NN>-run<N>.subject.json sidecar (default: edit-only)")
     grader.add_argument("--timeout", type=int, default=120, help="seconds before a replay is killed (default: 120)")
+
+    regrader = sub.add_parser(
+        "regrade",
+        help="re-grade recorded trials without replays: check a grader change, or record them under a new rubric",
+        description=(
+            "Re-grade a case's recorded trials from their saved scripts and transcripts, "
+            "replaying nothing: every replay answer comes from the controls or from a result "
+            "already on record for the same fix. Check mode (the default) grades a temporary "
+            "copy of the case, writes nothing, and says whether each run's verdict and tags "
+            "match its record (a judged record compares as pending-judge plus the questions "
+            "asked). A fix with no recorded replay needs a real replay: nothing is written. "
+            "--write then records every run under the current rubric (older lines are kept) "
+            "and prints NEXT= for the runs that wait for the judge."
+        ),
+        epilog=(
+            "Prints one RUN=<n> WAS=<verdict>[<tags>] NOW=<verdict>[<tags>] SAME|CHANGED line per run, "
+            "then REGRADE=same|changed RUNS= CHANGED= (or REGRADE=needs-replay RUN= FIX=). "
+            "Exit codes: 0 every run is the same, or --write succeeded; 1 a run changed (check mode) "
+            "or needs a replay; 2 usage error (a run with no record under --from included)."
+        ),
+    )
+    regrader.add_argument("--case", required=True, type=Path, help="the eval directory, e.g. evals/01-playwright-python-basic")
+    regrader.add_argument("--runs", required=True, type=_runs_arg, help="runs to re-grade: 1-12 or 1,3,5-7")
+    regrader.add_argument(
+        "--from",
+        dest="source_rubric",
+        default=RUBRIC,
+        metavar="RUBRIC",
+        help=f"the rubric whose records are the baseline, e.g. script-fix-v0 (default: {RUBRIC}, the current one)",
+    )
+    regrader.add_argument(
+        "--write",
+        action="store_true",
+        help=f"after a clean check, record the runs under {RUBRIC}; needs an older --from (check mode writes nothing)",
+    )
+    regrader.add_argument(
+        "--trials-root",
+        type=Path,
+        default=None,
+        help="folder holding <NN>-run<N>/ trial folders (default: ~/eval-trials)",
+    )
+    regrader.add_argument(
+        "--projects-root",
+        type=Path,
+        default=None,
+        help="Claude Code projects folder to find session transcripts (default: ~/.claude/projects)",
+    )
+    regrader.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="the repo that holds the case, whose ancestors are off limits to a trial's searches (default: two levels above --case)",
+    )
 
     judger = sub.add_parser(
         "judge",
@@ -389,6 +447,26 @@ def _judge_command(parser: argparse.ArgumentParser, args: argparse.Namespace) ->
     return result.exit_code
 
 
+def _regrade_command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """The ``regrade`` subcommand: validate the arguments, then check (or check and write)."""
+    if not args.case.is_dir():
+        parser.error(f"--case is not a directory: {args.case}")
+    try:
+        result = regrade(
+            args.case,
+            args.runs,
+            source_rubric=args.source_rubric,
+            write=args.write,
+            trials_root=args.trials_root,
+            projects_root=args.projects_root,
+            repo_root=args.repo_root,
+        )
+    except ValueError as exc:  # --write from the current rubric, a run with no record, a bad case.toml or trials.jsonl
+        parser.error(str(exc))
+        return 2  # parser.error exits; keeps the return type honest
+    return result.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the command line; returns the process exit code."""
     # The console may not be UTF-8 and the output can contain characters like
@@ -441,6 +519,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _run_command(parser, args)
+
+    if args.command == "regrade":
+        return _regrade_command(parser, args)
 
     if args.command == "judge":
         return _judge_command(parser, args)
