@@ -61,22 +61,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   CD's pass on real apps marks which of its element patterns break scripts
   in practice, and adds any missing ones (pattern names only). Feeds the
   local test site.
-- **First-eval level-set** (a working session together, not a solo
-  decision): (a) Python version for the repo venv — 3.12 in use by
-  `01-setup-env.ps1` (`.venv/` at repo root, `playwright==1.64.1` in
-  `requirements.txt`); confirm in the ADR;
-  (b) multi-user approach — *Decided 2026-10-31 (the CD): "We can remove
-  locust all together; python+playwright is sufficient for these evals, i
-  need to do actual experiments with these with single user first before
-  i start thinking about issues that only happen under a multiuser
-  load."* Closed: no multi-user runner for now (CLAUDE.md § Project pins);
-  (c) target policy — which public site(s) are fine for 1-user
-  record/codegen, and the local test site for single-user runs (§ Next);
-  (d) record+codegen vs. hand-written scripts — Eval 01 used codegen
-  (`--target python-async`); (e) per-eval file contract — settled for
-  script-fix cases by ADR-0001 (capture landed with grader-01 phase C:
-  `10-make-case.ps1`, `grading/capture.toml`). Outcome: an ADR + the
-  matching `<FILL-IN>`s in CLAUDE.md and `.claude/standards/` resolved.
 - **Playtest: a smoke trial with the new runner** (grader-01d, 2026-11-01).
   Run
   `.\20-run-trials.ps1 -Case evals\02-docs-journey-a -Model claude-haiku-5-5 -Count 1`
@@ -96,17 +80,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   allowlist (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md`
   item 9, `.claude/plans/DONE/grader-01bb.hardening.follow-up.md`
   decision 17).
-- **Rubric questions from the grader red-team** (grader-01bb, 2026-11-01).
-  Three fake-fix shapes that rubric-v0 doesn't settle; the variants are
-  described in `.claude/plans/DONE/grader-01bb.hardening.follow-up.md`
-  § Blocked:
-  - is `launch(slow_mo=…)` also `sleep` (zero), or only `changed-setup`
-    (judge, as today)?
-  - is an action's `delay=…` a fixed `sleep` (zero), or allowed?
-  - a `page.evaluate` that rewrites the page so the broken locator matches:
-    `retargeted` (judge), `changed-journey` (zero), or a new tag?
-
-  Each answer becomes a detector rule in the next hardening round (§ Next).
 
 <!-- --- -->
 
@@ -114,6 +87,15 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 - **Grader hardening, round 2** (grader-01bb's residue,
   `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` § Deferred).
+  - **The CD's rubric rulings** (*Decided 2026-11-01*, DONE.md):
+    - `launch(slow_mo=…)` and an action's `delay=…` are fixed `sleep`s
+      (zero);
+    - a `page.evaluate` that rewrites the page under test gets a new zero
+      tag (its name is the plan's call).
+
+    Both change the rubric's patterns, so the round opens with
+    `rubric-v1.md` (ADR-0001: a rubric change is a new file, and old trials
+    are re-graded from their saved fixes).
   - 7 red-team misses still slip past the static checks:
     - swapped clicks read as two judge `retargeted`, not
       `changed-journey`;
@@ -121,7 +103,7 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
       called under `if`);
     - JS run through `page.evaluate` is opaque (a sleep, a navigation);
     - a monkeypatched Playwright method;
-    - `delay=`.
+    - `delay=` (now ruled a `sleep`).
   - The small residue:
     - `getattr` in three more collectors;
     - a misleading test name;
@@ -129,10 +111,22 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
     - promote the static calibration (fake `replay_fn`) to a tested
       command.
 
-  *Depends on:* the red-team rubric questions (§ Needs Zack) for `delay=`,
-  `slow_mo` and page rewrites. The helper design needs a short design pass
-  first. Not urgent: phase E comes first, and the pilot's real trials will
-  show which shapes models actually produce.
+  *Plannable now:* rubric-v1, the three rulings and the small residue. The
+  helper design needs a short design pass first. It can land before or
+  after the phase F pilot (trials re-grade from their saved fixes); the
+  pilot's real trials will show which other shapes models actually
+  produce.
+- **Level-set ADR** (the CD adopted current practice, *Decided
+  2026-11-01*, DONE.md). Write ADR-0002 recording: Python 3.12 in a
+  repo-root `.venv` built by `01-setup-env.ps1`, with
+  `playwright==1.64.1`; the target policy (playwright.dev for 1-user
+  record/codegen and single replays only, a local test site for anything
+  more); codegen-recorded scripts. It records what's in use, so no version
+  changes. Then resolve the matching markers: `CLAUDE.md` (the stack pin
+  and the codegen workflow), the Python half of `coding.md`'s language
+  pin, the version half of `review.md`'s pin check, and
+  `01-setup-env.ps1`'s "ADR pending" comment. Docs-only and small:
+  `/zmh-producer:backlog-plan-gen level-set ADR`, or one sitting.
 - **Local test site** (the CD's request, 2026-10-30; absorbs "Local load
   target"): a locally hosted web app (on the PC or in a container), more
   complex than playwright.dev, with a variety of elements in different
@@ -155,22 +149,26 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 ## Later
 
 - **Complete the scaffold's `<FILL-IN>` markers** (left by
-  `/zmh-producer:studio-init`; most resolve at the first-eval level-set):
+  `/zmh-producer:studio-init`; the level-set's decided half is the
+  Level-set ADR item in § Next):
   - [ ] `CLAUDE.md` — stack/version ADR pin; codegen workflow (Tech
-        stack). Done: trial-run loop + Playtest SOP, `skills/` list, file
-        contract for script-fix cases (ADR-0001), multi-user approach
-        (none for now, 2026-10-31), static-reviewer agent name
-        (`eval-static-reviewer`, grader-01c)
+        stack): both → the Level-set ADR. Done: trial-run loop + Playtest
+        SOP, `skills/` list, file contract for script-fix cases
+        (ADR-0001), multi-user approach (none for now, 2026-10-31),
+        static-reviewer agent name (`eval-static-reviewer`, grader-01c)
   - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
         venv bootstrap; refine pass after grader-01b)
-  - [ ] `.claude/standards/coding.md` — Python version + lint/type pin;
-        remaining Playwright API pins (waits + transaction timers done)
+  - [ ] `.claude/standards/coding.md` — Python version (→ the Level-set
+        ADR); lint/type pin and the remaining Playwright API pins (sync vs
+        async, browser channel; waits + transaction timers done), which
+        the level-set didn't decide
   - [x] `.claude/standards/architecture.md` — shared-tooling location
         (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
         (ADR-0001)
   - [x] `.claude/standards/testing.md` — test/check runner; test directory (grader-01b)
   - [ ] `.claude/standards/review.md` — static-reviewer version/API pins
+        (the version half → the Level-set ADR)
   - [ ] `.claude/agents/README.md` — anticipated agents (the specialist
         table is done: `eval-static-reviewer`, grader-01c)
   - [ ] `.claude/checklists/README.md` — per-workflow checklists (as
@@ -180,12 +178,14 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 - **SDK trial harness** — run trials unattended with the Claude Agent SDK:
   pick model + effort + tools, log or deny every tool call before it runs,
   save the full transcript, hand the result to the grader-01 grader.
-  *Depends on:* isolated trial environment, grader-01 phase E.
+  *Depends on:* the isolated trial environment (grader-01 phase E is done).
 - **Eval 01 variant: misleading evidence** — deliberately corrupt the
   characters in `results.txt` (as the first capture did by accident) while
   the trace stays correct. Tests whether a model cross-checks the trace or
   runs its fix instead of copying implausible text (Haiku 4.5's first
-  trial run did neither). *Depends on:* Eval 01 done.
+  trial run did neither). Unblocked (Eval 01 is complete); it stays in
+  Later behind the phase F pilot, whose numbers it would be compared
+  against.
 
 <!-- --- -->
 

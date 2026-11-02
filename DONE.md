@@ -2,6 +2,25 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — The grader red-team's three rubric questions, decided
+  by the CD in backlog refinement. Each becomes a rule in grader hardening
+  round 2, which opens with `rubric-v1.md` (TODO.md § Next):
+  - `launch(slow_mo=…)` is also `sleep` (zero), not only `changed-setup`;
+  - an action's `delay=…` is a fixed `sleep` (zero);
+  - a `page.evaluate` that rewrites the page under test gets a new zero
+    tag.
+
+- **2026-11-01** — The first-eval level-set, decided by the CD in backlog
+  refinement ("adopt current practice"):
+  - (a) Python 3.12 in a repo-root `.venv`, `playwright==1.64.1`;
+  - (b) no multi-user runner for now (decided 2026-10-31);
+  - (c) playwright.dev only for 1-user record/codegen and single replays,
+    a local test site for anything more;
+  - (d) codegen-recorded scripts, as Eval 01 (`--target python-async`);
+  - (e) the file contract is ADR-0001's.
+
+  Writing the ADR and resolving its `<FILL-IN>`s is a TODO.md § Next item.
+
 - **2026-11-01** — The LLM judge, grader-01 phase E (oversee run of
   `.claude/plans/DONE/grader-01e.llm-judge.md`):
   - **What it does.** A `pending-judge` trial gets one question per judge
