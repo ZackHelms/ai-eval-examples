@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **grader-01bc oversee run** (2026-11-02): plan
+  `.claude/plans/grader-01bc.hardening-round-2.md`, started by
+  `/zmh-producer:backlog-burndown` (run 1 of 2) on the branch
+  `worktree-oversee+grader-01bc`. No commits landed yet.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
