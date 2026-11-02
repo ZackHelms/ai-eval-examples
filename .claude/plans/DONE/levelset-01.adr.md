@@ -1,6 +1,8 @@
 # levelset-01 — ADR-0002: the stack pins the first evals were built on
 
-**Status:** DRAFT
+**Status:** implemented 2026-11-02, `7f2ed6b..` on branch
+`worktree-oversee+levelset-01` (oversee run; follow-up:
+`levelset-01.adr.follow-up.md`)
 **Requested:** 2026-11-01. Drafted at `8468a63` by
 `/zmh-producer:backlog-plan-gen`. Source: the CD's first-eval level-set
 ("adopt current practice", DONE.md 2026-11-01; TODO.md § Next "Level-set

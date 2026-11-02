@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **levelset-01 oversee run** (2026-11-02): plan
-  `.claude/plans/levelset-01.adr.md`, started by
-  `/zmh-producer:backlog-burndown` (run 2 of 2) on the branch
-  `worktree-oversee+levelset-01`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -88,13 +85,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Next
 
-- **Level-set ADR** (the CD adopted current practice, *Decided
-  2026-11-01*, DONE.md): ADR-0002 records Python 3.12 in `.venv\`,
-  `playwright==1.64.1`, the target policy and codegen-recorded scripts.
-  The matching `<FILL-IN>`s in `CLAUDE.md`, `coding.md`, `review.md` and
-  `01-setup-env.ps1` then point at it. Docs only, one haiku task.
-  **Plan ready (2026-11-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/levelset-01.adr.md`
 - **Grader: follow helpers at their call sites** (the two red-team misses
   grader-01bc left, `zero-uncalled-def` and `zero-if-around-helper`;
   `.claude/plans/DONE/grader-01bc.hardening-round-2.follow-up.md`). The
@@ -124,26 +114,25 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 ## Later
 
 - **Complete the scaffold's `<FILL-IN>` markers** (left by
-  `/zmh-producer:studio-init`; the level-set's decided half is the
-  Level-set ADR item in § Next):
-  - [ ] `CLAUDE.md` — stack/version ADR pin; codegen workflow (Tech
-        stack): both → the Level-set ADR. Done: trial-run loop + Playtest
+  `/zmh-producer:studio-init`; the level-set's decided half is
+  ADR-0002 (levelset-01)):
+  - [x] `CLAUDE.md` — stack/version pin and codegen workflow (ADR-0002).
+        Done: trial-run loop + Playtest
         SOP, `skills/` list, file contract for script-fix cases
         (ADR-0001), multi-user approach (none for now, 2026-10-31),
         static-reviewer agent name (`eval-static-reviewer`, grader-01c)
   - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
         venv bootstrap; refine pass after grader-01b)
-  - [ ] `.claude/standards/coding.md` — Python version (→ the Level-set
-        ADR); lint/type pin and the remaining Playwright API pins (sync vs
-        async, browser channel; waits + transaction timers done), which
-        the level-set didn't decide
+  - [ ] `.claude/standards/coding.md` — Python version done (ADR-0002);
+        open: lint/type pin and the remaining Playwright API pins (sync vs
+        async, browser channel; waits + transaction timers done)
   - [x] `.claude/standards/architecture.md` — shared-tooling location
         (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
         (ADR-0001)
   - [x] `.claude/standards/testing.md` — test/check runner; test directory (grader-01b)
-  - [ ] `.claude/standards/review.md` — static-reviewer version/API pins
-        (the version half → the Level-set ADR)
+  - [ ] `.claude/standards/review.md` — static-reviewer API pins (the
+        version half is done: ADR-0002)
   - [ ] `.claude/agents/README.md` — anticipated agents (the specialist
         table is done: `eval-static-reviewer`, grader-01c)
   - [ ] `.claude/checklists/README.md` — per-workflow checklists (as

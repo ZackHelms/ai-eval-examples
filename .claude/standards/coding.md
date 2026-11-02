@@ -9,8 +9,8 @@ Python/Playwright fixtures, pwsh repo scripts.
 
 ## Language
 
-- `<FILL-IN: Python version + lint/type pin, decided at the first-eval
-  level-set, e.g. "Python 3.12, type hints on tooling, ruff clean">`.
+- Python 3.12 (ADR-0002). `<FILL-IN: lint/type pin, e.g. "type hints on
+  tooling, ruff clean"; the level-set left it open>`.
 - No implicit escape hatches (bare `except:`, swallowed errors, untyped
   catch-alls) without a comment justifying the one safe boundary.
 - Prefer pure functions in tooling; return new values rather than mutate
