@@ -17,7 +17,9 @@ Eval 01's runs 1–12 (2026-10-29/30, Claude Code 2.1.312–2.1.314).
   error, and `-Count` starts after the highest run found.
 - The first harness problem stops the batch (a non-zero exit, a timeout, or
   no `result` line): it prints a `HARNESS=` line and exits 1. Every batch
-  ends with a `NEXT=.\30-grade-trials.ps1 ...` line that grades it.
+  ends with a `NEXT=.\30-grade-trials.ps1 ...` line that grades it. That
+  command also judges `pending-judge` trials (paid Sonnet calls, about
+  $0.01–0.03 a question); add `-NoJudge` to skip it.
 - `--permission-mode default` still works on 2.1.314 although `--help` no
   longer lists it; the runner keeps it.
 
@@ -107,7 +109,9 @@ Each gotcha below is handled by the script.
 
 - Grade with `.\30-grade-trials.ps1 -Case evals\<slug> -Runs 3-12` (add
   `-Tools interactive` for interactive runs); `-Report` prints pass rates.
-  It replays the reference and the input as controls before and after the
+  After grading it also judges `pending-judge` trials (paid Sonnet calls,
+  about $0.01–0.03 a question; `-NoJudge` skips it; see
+  `.claude/skills/scriptfix-grader.md` § The judge). It replays the reference and the input as controls before and after the
   batch, replays each distinct fix once, and records `grading/trials.jsonl`
   and `grading/fixes/`. If a control fails, it records nothing. Eval 01's
   calibration took 14 replays for 12 runs. `python -m scriptfix` itself
