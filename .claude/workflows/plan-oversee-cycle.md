@@ -139,6 +139,27 @@ Learned on grader-01bb's run (2026-11-01):
   The routed misses doubled task 5, so it ran as two spawns (timeouts,
   detector tables), each one commit.
 
+Learned on grader-01e's run (2026-11-01):
+
+- **The guard also refuses a computed argument.** A Python call whose
+  argument holds a `$VAR` (e.g. `$CLAUDE_JOB_DIR/tmp/x.py`) is refused as
+  "a value computed at runtime"; write the literal path. A `cd <path> && …`
+  is refused when the path holds the letters "git". Write scratch scripts
+  with the Write tool and run them from the worktree with relative paths.
+- **A paid live step can run beside a code task that doesn't touch its
+  inputs.** The hour-long calibration ran while task 4's implementer
+  worked; the spawn prompt named the files the run reads as off limits.
+  When the overseer must commit meanwhile (a prompt revision), use
+  `git commit -F <msg> -- <path>`: it commits only that path and leaves the
+  implementer's staged and unstaged files alone.
+- **A usage limit looks like a call error, not a miss.** When the account
+  hits its limit, the nested `claude -p` exits 1 with an empty stderr, so
+  calibration stops with `CALIBRATION=error`. It doesn't spend the plan's
+  one prompt revision: re-run the calibration after the limit resets. A
+  halted run's handoff is the In-progress entry, rewritten on the default
+  branch from the primary checkout (`ExitWorktree` keep, then edit, commit
+  and push there).
+
 ## Required validation
 
 Each overseer run self-gates (the project validation procedure green per task

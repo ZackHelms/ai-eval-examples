@@ -136,6 +136,19 @@ quotes). Judging asks nothing and exits 1 unless that record matches the
 current judge version and items. The run stops at `-MaxTotalUsd` ($6 by
 default).
 
+**Measured (grader-01e, 2026-11-01).** A full calibration is 145 calls in
+about an hour and costs about $1.10 (under a cent a call on average, though
+a first call is about $0.03). Judging Eval 01's runs 10 and 12 was 6 calls,
+$0.10. A call that fails with `claude exited 1:` and nothing after it is
+usually the account's usage limit: calibrate again once it resets.
+
+**Keep the deduction's caveat in `frame.md`.** Without the sentence saying
+the same-element deduction doesn't make a locator specific, the judge
+answered `ok` 3 times in 5 for a pattern that matches any name. Its
+reasoning: the script passed, so the locator matched one element. The
+`broad-pattern` question caught that fix anyway, but the `retargeted` item
+missed calibration.
+
 ## Rules the rubric doesn't spell out
 
 - **Only method calls are steps** (`x.click()`), never bare-name calls
