@@ -7,7 +7,10 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-*Nothing in progress.*
+- **levelset-01 oversee run** (2026-11-02): plan
+  `.claude/plans/levelset-01.adr.md`, started by
+  `/zmh-producer:backlog-burndown` (run 2 of 2) on the branch
+  `worktree-oversee+levelset-01`. No commits landed yet.
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
