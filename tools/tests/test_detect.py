@@ -492,6 +492,16 @@ def test_sleep_used_as_a_value(extra):
     assert found(with_extra(extra), fix) == []
 
 
+@pytest.mark.parametrize(
+    "extra", ['nap = getattr(time, "sleep")', 'w = getattr(page, "wait_for_timeout")']
+)
+def test_getattr_sleep_used_as_a_value(extra):
+    fix = with_extra(extra)
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert found(fix, fix) == []
+
+
 def test_sleep_name_imported_from_a_sleep_module_used_as_a_value():
     fix = "from time import sleep as pause\n" + with_extra("nap = pause")
     assert only(fix, TAG_SLEEP, SEVERITY_ZERO).line == line_of(fix, "nap = pause")
@@ -865,6 +875,14 @@ def test_force_true_and_dispatch_event():
     assert finding.line == line_of(forced, "force=True")
     dispatched = with_extra('await page.get_by_role("link", name="Start").dispatch_event("click")')
     assert tags(dispatched) == [TAG_FORCE]
+
+
+def test_getattr_dispatch_event_is_a_force():
+    fix = with_extra(
+        'await getattr(page.get_by_role("link", name="Start"), "dispatch_event")("click")'
+    )
+    assert tags(fix) == [TAG_FORCE]
+    assert found(fix, fix) == []
 
 
 def test_force_with_a_variable_counts_and_force_false_does_not():
@@ -1302,6 +1320,12 @@ def test_wait_for_timeout_is_a_sleep_not_a_new_wait():
     assert tags(fix) == [TAG_SLEEP]
 
 
+def test_getattr_wait_is_a_new_wait():
+    fix = with_extra('await getattr(page, "wait_for_load_state")()')
+    assert tags(fix) == [TAG_NEW_WAIT]
+    assert found(fix, fix) == []
+
+
 def test_new_wait_already_in_reference():
     reference = with_extra('await page.wait_for_load_state("load")')
     assert found(with_extra('await page.wait_for_load_state("load")'), reference) == []
@@ -1373,6 +1397,20 @@ def test_first_last_and_nth():
     assert only(first, TAG_FIRST_NTH, SEVERITY_SMELL).line == line_of(first, ".first")
     assert tags(last) == [TAG_FIRST_NTH]
     assert tags(nth) == [TAG_FIRST_NTH]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        'await getattr(page.get_by_role("link"), "nth")(0).click()',
+        'first = getattr(page.get_by_role("link"), "first")',
+        'last = getattr(page.get_by_role("link"), "last")',
+    ],
+)
+def test_getattr_first_last_and_nth(extra):
+    fix = with_extra(extra)
+    assert tags(fix) == [TAG_FIRST_NTH]
+    assert found(fix, fix) == []
 
 
 def test_first_nth_already_in_reference():

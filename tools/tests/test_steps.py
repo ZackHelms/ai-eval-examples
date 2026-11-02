@@ -114,7 +114,7 @@ def test_classified_assertion_is_one_step_without_its_inner_calls() -> None:
     ]
 
 
-def test_steps_inside_a_classified_call_are_not_extracted() -> None:
+def test_a_non_step_call_inside_a_classified_call_adds_no_step() -> None:
     source = 'await page.goto(await page.get_attribute("a", "href"))'
     assert kinds_and_names(source) == [(KIND_NAVIGATION, "goto")]
 
@@ -601,6 +601,33 @@ def test_nested_markers_close_in_order() -> None:
     assert [s.name for s in steps_of(source)] == ["start:outer", "start:inner", "click", "end", "end"]
 
 
+def test_steps_in_a_markers_arguments_come_before_its_start() -> None:
+    source = """
+        with event("t", note=await page.click("#a")):
+            await page.hover("#b")
+    """
+    assert kinds_and_names(source) == [
+        (KIND_ACTION, "click"),
+        (KIND_MARKER, "start:t"),
+        (KIND_ACTION, "hover"),
+        (KIND_MARKER, "end"),
+    ]
+
+
+def test_steps_in_a_markers_arguments_come_in_source_order() -> None:
+    source = """
+        with event(await page.fill("#a", "x"), await page.press("#a", "A"), note=page.hover("#b")):
+            pass
+    """
+    assert kinds_and_names(source) == [
+        (KIND_ACTION, "fill"),
+        (KIND_ACTION, "press"),
+        (KIND_ACTION, "hover"),
+        (KIND_MARKER, "start:await page.fill('#a', 'x')"),
+        (KIND_MARKER, "end"),
+    ]
+
+
 def test_non_marker_with_item_is_searched_for_steps() -> None:
     source = """
         with page.expect_navigation(timeout=page.click("a")):
@@ -1065,6 +1092,35 @@ def test_getattr_that_is_not_the_plain_two_argument_form_is_not_a_step(
     setup: str, call: str
 ) -> None:
     assert steps_of(f"{setup}\n{call}") == []
+
+
+def test_a_getattr_navigation_result_is_not_substituted_like_the_plain_call() -> None:
+    plain = """
+        resp = page.goto(url)
+        expect(resp).to_be_ok()
+    """
+    spelled = """
+        resp = getattr(page, "goto")(url)
+        expect(resp).to_be_ok()
+    """
+
+    def shape(source: str) -> list[tuple[str, str, str, tuple[str, ...]]]:
+        return [(s.kind, s.name, s.target, s.values) for s in steps_of(source)]
+
+    assert shape(spelled) == shape(plain)
+    assert shape(plain)[-1][2] == "resp"
+
+
+@pytest.mark.parametrize(
+    "name", ["set_options", "start", "stop", "click", "goto", "wait_for_url"]
+)
+def test_a_getattr_call_of_a_step_setup_or_tracing_name_is_not_substitutable(name: str) -> None:
+    source = f"""
+        def run(page, thing):
+            value = getattr(thing, "{name}")(1)
+            value.click()
+    """
+    assert steps_of(source)[-1].target == "value"
 
 
 # --- boolean state keywords on matchers ---------------------------------------

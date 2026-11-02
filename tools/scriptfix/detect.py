@@ -351,10 +351,15 @@ def _sleeps(module: _Module) -> list[_Hit]:
                 break
     # A sleep function passed around or bound to a name (``nap = asyncio.sleep``).
     for node in ast.walk(module.tree):
-        if id(node) in module.called or not isinstance(getattr(node, "ctx", None), ast.Load):
+        if id(node) in module.called:
             continue
-        if (isinstance(node, ast.Attribute) and node.attr in ("sleep", "wait_for_timeout")) or (
-            isinstance(node, ast.Name) and module.qualify(node) in _SLEEP_FUNCTIONS
+        # ``getattr(time, "sleep")`` bound or passed, not called.
+        if isinstance(node, ast.Call):
+            if module.facts.getattr_name(node) in ("sleep", "wait_for_timeout"):
+                hits.append(_Hit(_key(node), node.lineno, "sleep used as a value"))
+        elif isinstance(getattr(node, "ctx", None), ast.Load) and (
+            (isinstance(node, ast.Attribute) and node.attr in ("sleep", "wait_for_timeout"))
+            or (isinstance(node, ast.Name) and module.qualify(node) in _SLEEP_FUNCTIONS)
         ):
             hits.append(_Hit(_key(node), node.lineno, "sleep used as a value"))
     return sorted(hits, key=lambda h: h.line)
@@ -419,6 +424,7 @@ def _forces(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
         named, _ = module.keywords(call)
+        func = module.callee(call)
         forced = [
             value
             for key, value in named
@@ -426,7 +432,7 @@ def _forces(module: _Module) -> list[_Hit]:
         ]
         if forced:
             hits.append(_Hit(_key(call), call.lineno, f"force={_key(forced[0])}"))
-        elif isinstance(call.func, ast.Attribute) and call.func.attr == "dispatch_event":
+        elif isinstance(func, ast.Attribute) and func.attr == "dispatch_event":
             hits.append(_Hit(_key(call), call.lineno, "dispatch_event call"))
     return hits
 
@@ -558,11 +564,12 @@ def _patched_methods(module: _Module) -> list[_Hit]:
 
 
 def _new_waits(module: _Module) -> list[_Hit]:
-    return [
-        _Hit(_key(call), call.lineno, f"{call.func.attr} call")
-        for call in module.calls()
-        if isinstance(call.func, ast.Attribute) and call.func.attr in NEW_WAIT_NAMES
-    ]
+    hits = []
+    for call in module.calls():
+        func = module.callee(call)
+        if isinstance(func, ast.Attribute) and func.attr in NEW_WAIT_NAMES:
+            hits.append(_Hit(_key(call), call.lineno, f"{func.attr} call"))
+    return hits
 
 
 def _is_broad(node: ast.AST) -> bool:
@@ -612,12 +619,15 @@ def _first_nth(module: _Module) -> list[_Hit]:
             and node.attr in ("first", "last")
         ):
             hits.append(_Hit(_key(node), node.lineno, f".{node.attr}"))
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "nth"
-        ):
-            hits.append(_Hit(_key(node), node.lineno, ".nth(...)"))
+        elif isinstance(node, ast.Call):
+            func = module.callee(node)
+            if isinstance(func, ast.Attribute) and func.attr == "nth":
+                hits.append(_Hit(_key(node), node.lineno, ".nth(...)"))
+            # ``getattr(loc, "first")`` reads like ``loc.first``.
+            else:
+                name = module.facts.getattr_name(node)
+                if name in ("first", "last"):
+                    hits.append(_Hit(_key(node), node.lineno, f".{name}"))
     return sorted(hits, key=lambda h: h.line)
 
 

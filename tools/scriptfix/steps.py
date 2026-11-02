@@ -619,11 +619,36 @@ def _substitutable_value(value: ast.expr) -> bool:
         if is_expect_call(value) or is_assertion_call(value):
             return False
         name = call_name(value)
+        if name is None:
+            name = _getattr_callee_name(value)
         if name is not None and (
             name in _KIND_BY_NAME or name in EXPECT_SETUP or name in TRACING_SETUP
         ):
             return False
     return True
+
+
+def _getattr_callee_name(call: ast.Call) -> str | None:
+    """``name`` when ``call`` calls ``getattr(<x>, "<name>")``, else ``None``.
+
+    Reads the shape only (bare ``getattr``, two arguments, a string
+    constant) with no rebinding check, unlike ``ModuleFacts.getattr_name``:
+    the caller treats a match as "not substitutable", the safe side.
+    """
+    inner = call.func
+    if not (
+        isinstance(inner, ast.Call)
+        and isinstance(inner.func, ast.Name)
+        and inner.func.id == GETATTR_NAME
+        and len(inner.args) == 2
+        and not inner.keywords
+        and not isinstance(inner.args[0], ast.Starred)
+    ):
+        return None
+    name = inner.args[1]
+    if isinstance(name, ast.Constant) and isinstance(name.value, str):
+        return name.value
+    return None
 
 
 def _is_scalar_constant(value: ast.expr | None) -> bool:
@@ -929,6 +954,11 @@ class _Extractor:
             if isinstance(expr, ast.Call) and call_name(expr) in MARKER_CALLS:
                 label = _marker_label(expr, self.normalize)
                 self.kinds[call_key(expr)] = KIND_MARKER
+                # Steps in the marker's own arguments run first.
+                for argument in expr.args:
+                    self.visit(argument)
+                for keyword in expr.keywords:
+                    self.visit(keyword.value)
                 self.steps.append(Step(KIND_MARKER, f"start:{label}", "", (), (), expr.lineno))
                 open_markers += 1
             else:

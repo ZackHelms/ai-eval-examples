@@ -173,3 +173,6 @@ tags = ["changed-journey"]
 
 [files."zero-patched-click.py"]
 tags = ["changed-journey"]
+
+[files."zero-getattr-dispatch.py"]
+tags = ["changed-journey", "force"]
