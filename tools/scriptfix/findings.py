@@ -23,7 +23,7 @@ SEVERITIES = (
 class Finding:
     """One rubric observation about a script or transcript."""
 
-    tag: str  # a tag from rubric-v0.md
+    tag: str  # a tag from rubric-v1.md
     severity: str  # one of SEVERITIES
     line: int  # 1-based line in the script it concerns; 0 for transcript findings
     detail: str  # short human-readable reason

@@ -10,7 +10,7 @@
     venv.
 
     Grade mode (-Case and -Runs) grades the saved trial runs of one script-fix
-    case under rubric script-fix-v0: transcript validity, fair play, static
+    case under rubric script-fix-v1: transcript validity, fair play, static
     checks, then one replay per distinct fix with control replays of the
     reference and the broken input before and after. Verdicts are recorded in
     <case>\grading\trials.jsonl. Replays are single, sequential replays against

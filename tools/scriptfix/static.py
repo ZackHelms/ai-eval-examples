@@ -137,7 +137,7 @@ def check_static(
     journey is compared with the input's too and the result without a zero
     finding wins; if both or neither have one, the reference's is kept.
 
-    Those escalate cases then get rubric-v0 § Escalate cases item 2: the
+    Those escalate cases then get rubric-v1 § Escalate cases item 2: the
     blocked step "is kept or removed, never retargeted". The blocked step is
     found by position (``blocked_step``), and the fix lines that retarget it
     by ``_retargeted_blocked_lines``. Each such line gets one zero

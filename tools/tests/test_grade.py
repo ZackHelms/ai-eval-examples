@@ -12,6 +12,7 @@ import os
 from pathlib import Path, PureWindowsPath
 
 import scriptfix
+from scriptfix import RUBRIC
 from scriptfix.grade import GradeResult, grade, locate_trial, mangle_path
 from scriptfix.record import fix_hash, read_trials, write_trials
 from scriptfix.replay import ReplayResult
@@ -117,7 +118,7 @@ class World:
         (self.case_dir / "inputs").mkdir(parents=True)
         (grading / "case.toml").write_bytes(
             (
-                'rubric = "script-fix-v0"\n'
+                f'rubric = "{RUBRIC}"\n'
                 f'expected = "{expected}"\n'
                 'issue = ["locator-text"]\n'
                 'origin = "handmade"\n'
@@ -166,7 +167,7 @@ class World:
 
     def seed_prior_record(self) -> bytes:
         """Write a prior valid verdict for run 1 and return the file's bytes."""
-        prior = {"run": 1, "rubric": "script-fix-v0", "verdict": "pass", "tags": [], "fix": "abc"}
+        prior = {"run": 1, "rubric": RUBRIC, "verdict": "pass", "tags": [], "fix": "abc"}
         write_trials(self.trials_path, [prior])
         return self.trials_path.read_bytes()
 
@@ -393,7 +394,7 @@ def test_pass_records_info_and_smell_tags(tmp_path: Path) -> None:
     (rec,) = world.records()
     assert rec["judge"] == [] and rec["cost_usd"] == 0.25 and rec["session"] == "sess-1"
     assert rec["subject"] == {"model": "model-a", "effort": "default", "context": "none", "tools": "edit-only", "cli": "9.9.9"}
-    assert (rec["date"], rec["grader"], rec["rubric"], rec["run"]) == ("2026-10-31", scriptfix.__version__, "script-fix-v0", 1)
+    assert (rec["date"], rec["grader"], rec["rubric"], rec["run"]) == ("2026-10-31", scriptfix.__version__, RUBRIC, 1)
     assert rec["replay"] == {"exit_code": 0, "failing_line": None, "timed_out": False}
 
 
@@ -426,19 +427,19 @@ def test_escalate_case_is_pending_judge_and_never_replays_a_trial(tmp_path: Path
 def test_regrading_replaces_the_line_and_keeps_other_rubrics(tmp_path: Path) -> None:
     world = World(tmp_path)
     other = {"run": 1, "rubric": "other-rubric", "verdict": "pass"}
-    keep = {"run": 2, "rubric": "script-fix-v0", "verdict": "fail", "tags": ["old"]}
+    keep = {"run": 2, "rubric": RUBRIC, "verdict": "fail", "tags": ["old"]}
     write_trials(world.trials_path, [other, keep])
     world.add_trial(1, REFERENCE, None)  # invalid first time
     world.grade([1])
     assert [(r["run"], r["rubric"], r["verdict"]) for r in world.records()] == [
         (1, "other-rubric", "pass"),
-        (1, "script-fix-v0", "invalid"),
-        (2, "script-fix-v0", "fail"),
+        (1, RUBRIC, "invalid"),
+        (2, RUBRIC, "fail"),
     ]
     world.add_good_trial(1, REFERENCE + "# redo\n")
     world.grade([1])
     rows = [(r["run"], r["rubric"], r["verdict"]) for r in world.records()]
-    assert rows == [(1, "other-rubric", "pass"), (1, "script-fix-v0", "pass"), (2, "script-fix-v0", "fail")]
+    assert rows == [(1, "other-rubric", "pass"), (1, RUBRIC, "pass"), (2, RUBRIC, "fail")]
     assert b"\r" not in world.trials_path.read_bytes()
 
 

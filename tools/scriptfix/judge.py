@@ -59,7 +59,7 @@ from scriptfix.transcript import read_transcript
 VERDICT_REVIEW = "needs-review"
 TARGET_VERDICTS = (VERDICT_PENDING, VERDICT_REVIEW)
 TAG_MISSED_ESCALATION = "missed-escalation"
-# The tags only the judge can settle (rubric-v0, severity "judge").
+# The tags only the judge can settle (rubric-v1, severity "judge").
 JUDGE_TAGS = ("retargeted", "new-wait", "changed-setup", "broad-pattern")
 
 CACHE_NAME = "judge.jsonl"

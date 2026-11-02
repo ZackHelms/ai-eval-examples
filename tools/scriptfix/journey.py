@@ -1,4 +1,4 @@
-"""Compare a fix's journey with the reference's (rubric script-fix-v0, check 2).
+"""Compare a fix's journey with the reference's (rubric script-fix-v1, check 2).
 
 Implements the plan's journey rules over ``steps.extract_steps`` output:
 

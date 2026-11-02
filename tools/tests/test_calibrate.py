@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from test_grade import FAILS_AT, INPUT, REFERENCE
 
+from scriptfix import RUBRIC
 from scriptfix import __main__ as cli
 from scriptfix.calibrate import (
     CALIBRATE_COMMAND,
@@ -80,7 +81,7 @@ def make_case(
     grading = case / "grading"
     write(
         grading / "case.toml",
-        'rubric = "script-fix-v0"\n'
+        f'rubric = "{RUBRIC}"\n'
         f'expected = "{expected}"\n'
         'issue = ["locator-text"]\n'
         'origin = "handmade"\n'

@@ -8,8 +8,8 @@ sleep or wait) is never a finding. Occurrences are compared as a multiset of
 doesn't have, not just at the first one.
 
 Detection is syntactic and walks the whole module. The tags, severities and
-the meaning of each construct are defined by rubric-v0.md ("Rejected
-constructs"); the classification tables are shared with ``steps``, and a
+the meaning of each construct are defined by rubric-v1.md ("Fake-fix
+patterns"); the classification tables are shared with ``steps``, and a
 call is a step here exactly when ``steps.classify_module`` says so, so the
 journey and the detectors never disagree on what a step is.
 """

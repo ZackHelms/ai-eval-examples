@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from scriptfix import makecase
+from scriptfix import RUBRIC, makecase
 from scriptfix.makecase import Edit, Recipe, build_scripts, load_recipe, make_case, probe_versions
 from scriptfix.replay import ReplayResult
 
@@ -473,8 +473,8 @@ OUTPUT_LF = (
     b'  File "script.py", line 18, in <module>\n'
     b"Error: boom\n"
 )
-CASE_02_TOML = """\
-rubric   = "script-fix-v0"
+CASE_02_TOML = f"""\
+rubric   = "{RUBRIC}"
 expected = "fix"
 issue    = ["locator-text"]
 origin   = "generated from 01-playwright-python-basic"

@@ -1,10 +1,10 @@
-"""Extract the ordered Playwright steps of a script (rubric script-fix-v0, check 2).
+"""Extract the ordered Playwright steps of a script (rubric script-fix-v1, check 2).
 
 A *step* is one classified call: a navigation, action, assertion, wait or
 setup call, or a transaction marker around a ``with`` body. Steps come out in
 source order, each with its receiver and arguments normalized so that
 formatting, quoting and moving a locator into a local variable don't change
-them (rubric-v0.md, "Not graded: code style").
+them (rubric-v1.md, "Not graded: code style").
 
 The classification tables are module-level so the detectors can reuse them,
 and ``classify_module`` is the call classification the journey and the
