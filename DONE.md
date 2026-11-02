@@ -2,6 +2,24 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-02** — Grader hardening, round 2 (oversee run of
+  `.claude/plans/DONE/grader-01bc.hardening-round-2.md`, grader 0.3.0):
+  - **Rubric `script-fix-v1`** (`rubrics/script-fix/rubric-v1.md`; v0
+    stays) holds the CD's rulings. A launch's `slow_mo` and an action's
+    `delay` are `sleep`. Script or markup run in the page (`evaluate`,
+    `add_init_script`, `set_content` and six more) is a new zero tag,
+    `changed-page`.
+  - **The journey:** two steps swapped in place, and a replaced Playwright
+    method (`Locator.click = …`), are `changed-journey`. `getattr` is read
+    in every detector, and steps inside a marker's arguments are found.
+  - **`.\30-grade-trials.ps1 -Regrade`** re-grades a case's recorded
+    trials without a single replay: a check that a grader change left the
+    verdicts alone, or `-Write` to record them under a new rubric.
+  - **Eval 01's 12 trials** are recorded under v1, with the same verdicts
+    as under v0. The judge answered runs 10 and 12 from its cache, at $0.
+  - **The red-team's 30 saved variants:** 28 are caught. The two left are
+    the helper variants, a Next item.
+
 - **2026-11-01** — The grader red-team's three rubric questions, decided
   by the CD in backlog refinement. Each becomes a rule in grader hardening
   round 2, which opens with `rubric-v1.md` (TODO.md § Next):

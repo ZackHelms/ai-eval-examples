@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **grader-01bc oversee run** (2026-11-02): plan
-  `.claude/plans/grader-01bc.hardening-round-2.md`, started by
-  `/zmh-producer:backlog-burndown` (run 1 of 2) on the branch
-  `worktree-oversee+grader-01bc`. No commits landed yet.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -88,23 +85,6 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Next
 
-- **Grader hardening, round 2** (grader-01bc; the CD's rubric rulings of
-  2026-11-01 and grader-01bb's residue,
-  `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` § Deferred):
-  - `rubric-v1.md`: `slow_mo` and an action's `delay` are `sleep`; script
-    or markup run in the page is a new zero tag, `changed-page`;
-  - 5 of the 7 red-team misses: swapped clicks and a replaced Playwright
-    method become `changed-journey`, and `delay`, a JS sleep and a JS
-    navigation are caught;
-  - the small residue (`getattr` in every detector, marker arguments, a
-    test name);
-  - `.\30-grade-trials.ps1 -Regrade`, which re-grades recorded trials
-    without replays. Eval 01's 12 trials are then re-graded under v1.
-
-  7 tasks (sonnet) plus free live steps: no replays, and the judge answers
-  from its cache. It can land before or after the phase F pilot.
-  **Plan ready (2026-11-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01bc.hardening-round-2.md`
 - **Level-set ADR** (the CD adopted current practice, *Decided
   2026-11-01*, DONE.md): ADR-0002 records Python 3.12 in `.venv\`,
   `playwright==1.64.1`, the target policy and codegen-recorded scripts.
@@ -113,12 +93,12 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   **Plan ready (2026-11-01)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/levelset-01.adr.md`
 - **Grader: follow helpers at their call sites** (the two red-team misses
-  grader-01bc leaves, `zero-uncalled-def` and `zero-if-around-helper`;
-  grader-01bb's follow-up § Deferred). The journey reads a def's steps
-  where it's defined, and the detectors don't treat a call to a helper
-  that holds steps as a step. A candidate design: inline helper bodies at
-  their call sites. It needs a short design pass before a plan, after
-  grader-01bc lands (same files).
+  grader-01bc left, `zero-uncalled-def` and `zero-if-around-helper`;
+  `.claude/plans/DONE/grader-01bc.hardening-round-2.follow-up.md`). The
+  journey reads a def's steps where it's defined, and the detectors don't
+  treat a call to a helper that holds steps as a step. A candidate design:
+  inline helper bodies at their call sites. It needs a short design pass
+  before a plan; grader-01bc has landed, so it's unblocked.
 - **Local test site** (the CD's request, 2026-10-30; absorbs "Local load
   target"): a locally hosted web app (on the PC or in a container), more
   complex than playwright.dev, with a variety of elements in different

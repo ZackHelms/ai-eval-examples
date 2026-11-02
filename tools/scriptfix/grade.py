@@ -1,7 +1,7 @@
 """Grade saved trials of a script-fix case, everything except the LLM judge.
 
 ``grade`` is the pipeline: find each run's script and transcript, apply the
-verdict rules of ``rubrics/script-fix/rubric-v0.md`` in order (first rule
+verdict rules of ``rubrics/script-fix/rubric-v1.md`` in order (first rule
 that decides wins), replay what needs replaying (at most once per distinct
 fix, strictly one at a time), bracket the batch with control replays of the
 case's reference and broken input, and record the verdicts in the case's
@@ -594,7 +594,7 @@ def grade(
     trials_path = case.grading_dir / "trials.jsonl"
     fixes_written: list[Path] = []
     if failure:
-        # A surprising control voids the batch (rubric-v0, Invalid trials):
+        # A surprising control voids the batch (rubric-v1, Invalid trials):
         # record nothing, so earlier valid verdicts survive an outage.
         out("control failed: nothing recorded")
     else:

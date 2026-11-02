@@ -18,7 +18,7 @@ evals/<slug>/
 ```
 
 A `grading/` holds either its own `rubric.md` (Eval 01) or a `case.toml`
-naming a shared rubric under `rubrics/`, e.g. `script-fix-v0`
+naming a shared rubric under `rubrics/`, e.g. `script-fix-v1`
 (ADR-0001, which lists the rest of a script-fix case's files).
 
 Dependencies point one way: `grading/` may reference `inputs/` (a check

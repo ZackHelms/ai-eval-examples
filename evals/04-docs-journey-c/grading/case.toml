@@ -1,4 +1,4 @@
-rubric   = "script-fix-v0"
+rubric   = "script-fix-v1"
 expected = "fix"
 issue    = ["locator-role"]
 origin   = "generated from 01-playwright-python-basic"

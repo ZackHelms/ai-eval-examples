@@ -1,8 +1,9 @@
-# Skill: the scriptfix grader (rubric script-fix-v0)
+# Skill: the scriptfix grader (rubric script-fix-v1)
 
 How `tools/scriptfix` grades script-fix trials, the rules that aren't
 obvious from the rubric, and how to extend it.
-- **Semantics:** `rubrics/script-fix/rubric-v0.md` is authoritative.
+- **Semantics:** `rubrics/script-fix/rubric-v1.md` is authoritative.
+  `rubric-v0.md` stays for the records graded under it.
 - **Spec and history:** `.claude/plans/DONE/grader-01b.deterministic-grader.md`.
 - **Decisions and known gaps:** its `.follow-up.md`, then
   `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` (the red-team
@@ -10,7 +11,8 @@ obvious from the rubric, and how to extend it.
 
 The grader landed in grader-01b, 2026-10-31, and was hardened in
 grader-01bb, 2026-11-01. The LLM judge landed in grader-01e (grader
-version 0.2.0).
+version 0.2.0). It was hardened again in grader-01bc (grader version
+0.3.0, rubric `script-fix-v1`).
 
 ## Run it
 
@@ -33,6 +35,21 @@ version 0.2.0).
 - With `-Judge` or `-Calibrate`, `-DryRun` lists what would be asked and
   asks nothing. `-Calibrate` also takes `-Samples`, `-Items` (never
   recorded), `-MaxTotalUsd` and `-Claude` (`-Judge` takes `-Claude` too).
+- `.\30-grade-trials.ps1 -Regrade -Case evals\<slug> -Runs 1-12 [-From
+  <rubric>] [-Write] [-RepoRoot <dir>]` re-grades a case's recorded trials
+  without a single replay.
+  - Check mode (the default) writes nothing. It grades a temp copy of the
+    case with a fake replay that answers from the replay results already on
+    record, and prints one `SAME` or `CHANGED` row per run, then
+    `REGRADE=same`, `changed` or `needs-replay` (exit 0 only for `same`).
+  - `-From` names the rubric whose records are the source (default: the
+    current one). `-Write` needs an older `-From`: it records each run under
+    the current rubric and leaves the older lines alone. It prints `NEXT=`
+    with the `-Judge` command for runs awaiting the judge.
+  - `-RepoRoot` sets the repo the answer-key search treats as the case's
+    repo. Pass it when running from a worktree.
+  - The judge's decision isn't re-checked: a judged record is compared by
+    its static form (`pending-judge` plus the questions asked).
 - `.\30-grade-trials.ps1 -Report` prints passes/valid, the 95% lower
   bound, pending, needs-review and invalid counts, and the top tags, per
   case × rubric × subject.
@@ -88,7 +105,7 @@ tags are recorded only on `pending-judge`.
 ## The judge (`judgeprompt.py`, `calibrate.py`, `judge.py`)
 
 It decides what the static checks only flag. Rubric semantics stay in
-`rubrics/script-fix/rubric-v0.md`; the judge's prompts live in
+`rubrics/script-fix/rubric-v1.md`; the judge's prompts live in
 `rubrics/script-fix/judge/`.
 
 **Questions.** One per judge flag, `<tag>:<line>` (`retargeted`, `new-wait`,
@@ -171,7 +188,11 @@ missed calibration.
     `check.to_be_visible()` an assertion.
   - A shadowed `expect` (bound by anything but a Playwright import) makes no
     assertions.
-  - `getattr(x, "name")` reads as `x.name`.
+  - `getattr(x, "name")` reads as `x.name`, in every detector too (they read
+    the callee through `module.callee`). A step called through `getattr` isn't
+    substituted for a local name.
+  - Steps inside a marker's arguments (`event("t", note=await
+    page.click(...))`) are extracted before its `start:` step.
   - A matcher's state keyword flips it: `to_be_visible(visible=False)` is
     `not_to_be_visible()`.
   - `**{"k": v}` and `**dict(k=v)` split like explicit keywords.
@@ -188,6 +209,12 @@ missed calibration.
   - Assertions are matched per gap between path steps, in order. An extra
     assertion is `added-assertion` (info), unless its gap has a
     `weakened-check`.
+  - **Reorder:** after the path matches by kind and name, the first aligned
+    step whose target or values differ from the reference's but equal another
+    reference step's is one zero `changed-journey` (a reordered step). Rules
+    2–3 are then skipped, as for a divergence; setup is still compared.
+    Options are ignored. A step retargeted to something the reference uses
+    nowhere is still `retargeted`.
   - Setup is compared without the timeout setters, which belong to
     `longer-timeout`.
 - **Timeouts:** the defaults are 5000 ms for assertions and 30000 ms for
@@ -199,6 +226,24 @@ missed calibration.
   - `.set_options(timeout=...)` on any receiver is checked against 5000.
   - A timeout setter used as a value (`wait = page.set_default_timeout`) is
     a hit.
+- **`slow_mo` and `delay` are sleeps** on any call, classified or not, named
+  or inside a `**` dict. The literal `0`, `0.0` and `None` don't count; any
+  other value does, including a name.
+  - `slow_mo` also stays in the setup comparison, unlike the timeout
+    setters. If a reference has `slow_mo=100`, a fix's `slow_mo=2000` is the
+    same count of `sleep` hits, so only `changed-setup` still flags it.
+- **`changed-page`:** a call, a loaded attribute (`run_js = page.evaluate`)
+  or a `getattr(x, "name")` value naming `evaluate`, `evaluate_handle`,
+  `evaluate_all`, `eval_on_selector`, `eval_on_selector_all`,
+  `add_script_tag`, `add_style_tag`, `add_init_script` or `set_content`, on
+  any receiver. The grader can't read the JavaScript, so it doesn't try to
+  tell reading from rewriting. `add_init_script` is also `changed-setup`.
+  `route`, `expose_function` and `expose_binding` stay out.
+- **Patched methods** are `changed-journey`: a store to or `del` of an
+  attribute, or `setattr`/`delattr` with a string name, where the name is a
+  navigation, action or wait name, `expect`, or any `to_*`/`not_to_*`
+  matcher. Setup and tracing names are left out; replacing them fakes no
+  step.
 - **Swallowed errors:** an except handler counts as re-raising only with a
   top-level `raise`. A conditional `raise` still swallows the other errors,
   and so does a `raise` that comes after a `return`.
@@ -257,12 +302,21 @@ missed calibration.
   `%TEMP%\redteam\<case>\`. After a grader change, re-check its saved
   variants statically (its procedure's step 3, over every file in that
   folder).
-- **Dry-run before spending replays:** call `scriptfix.grade.grade(...)` on
-  a temp copy of the case, with a fake `replay_fn`. It shows the replay
-  plan and the static verdicts at no cost to the site. Never run it on the
-  repo's case, because a grade writes into the case it's given.
-- **A rubric semantics change** goes in a new file, `rubric-v1.md`. Re-grade
-  from the saved `fixes/` and transcripts; never re-run the trials.
+- **Regrade check after every grader change:** `.\30-grade-trials.ps1
+  -Regrade -Case evals\<slug> -Runs <all> -From <current rubric>`. It must
+  print `REGRADE=same`: the change left the recorded verdicts alone. It costs
+  nothing and replays nothing. `REGRADE=needs-replay` means a fix has no
+  replay result on record; `changed` means a verdict or tag moved, so look
+  at the rows before going on.
+- **A rubric semantics change:**
+  1. Add a new `rubrics/script-fix/rubric-vN.md` (copy the last one, edit,
+     and list the changes at its end). Never edit an older file.
+  2. Bump `RUBRIC` and every `evals/*/grading/case.toml` together; the
+     gate fails in between, since `load_case` rejects a case whose rubric
+     isn't `RUBRIC`.
+  3. Per case, check with `-Regrade -From <old>`, then record with `-Write`.
+     Old lines stay; the new ones reuse the old replay results.
+  4. Judge the runs `NEXT=` names with `-Judge` (cached answers are free).
 
 ## Module map
 
@@ -282,5 +336,6 @@ missed calibration.
 | `judgeprompt.py` | the judge's questions, prompts, version and `claude -p` call |
 | `calibrate.py` | asking the labeled corpus items; the calibration record and gate |
 | `judge.py` | deciding `pending-judge` trials: reviews, cache, calls, verdicts |
+| `regrade.py` | re-grading recorded trials without replays: the check, and recording under a new rubric |
 | `report.py` | the pass-rate report |
 | `__main__.py` | the CLI |

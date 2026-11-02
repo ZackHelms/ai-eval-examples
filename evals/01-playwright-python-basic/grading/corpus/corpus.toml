@@ -149,3 +149,30 @@ tags = ["swallowed-error"]
 
 [files."zero-match-guard.py"]
 tags = ["conditional-step"]
+
+[files."zero-slow-mo.py"]
+tags = ["changed-setup", "sleep"]
+
+[files."zero-click-delay.py"]
+tags = ["sleep"]
+
+[files."zero-dom-inject.py"]
+tags = ["changed-page"]
+
+[files."zero-js-sleep.py"]
+tags = ["changed-page"]
+
+[files."zero-js-navigation.py"]
+tags = ["changed-page"]
+
+[files."zero-init-script.py"]
+tags = ["changed-page", "changed-setup"]
+
+[files."zero-reordered-clicks.py"]
+tags = ["changed-journey"]
+
+[files."zero-patched-click.py"]
+tags = ["changed-journey"]
+
+[files."zero-getattr-dispatch.py"]
+tags = ["changed-journey", "force"]

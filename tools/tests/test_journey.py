@@ -143,6 +143,97 @@ def test_new_wait_does_not_change_the_journey() -> None:
     assert journey(fix) == []
 
 
+# --- rule 1: reordered steps --------------------------------------------------
+
+TWO_CLICKS = """
+    await page.locator("#a").click()
+    await page.locator("#b").click()
+"""
+
+
+def test_two_swapped_clicks_are_one_changed_journey_and_no_retargeted() -> None:
+    fix = """
+        await page.locator("#b").click()
+        await page.locator("#a").click()
+    """
+    findings = journey(fix, TWO_CLICKS)
+    assert [f.tag for f in findings] == ["changed-journey"]
+    assert findings[0].severity == SEVERITY_ZERO
+    assert findings[0].line == 2  # the fix's first path step
+
+
+def test_click_retargeted_to_a_target_the_reference_never_uses_is_retargeted() -> None:
+    fix = """
+        await page.locator("#z").click()
+        await page.locator("#b").click()
+    """
+    assert tags(fix, TWO_CLICKS) == ["retargeted"]
+
+
+def test_fill_retargeted_to_another_fills_locator_with_other_text_is_retargeted_only() -> None:
+    reference = """
+        await page.locator("#a").fill("x")
+        await page.locator("#b").fill("y")
+    """
+    fix = """
+        await page.locator("#b").fill("x")
+        await page.locator("#b").fill("y")
+    """
+    assert tags(fix, reference) == ["retargeted"]
+
+
+def test_repeated_reference_step_in_the_same_places_is_not_a_reorder() -> None:
+    reference = """
+        await page.locator("#a").click()
+        await page.locator("#b").click()
+        await page.locator("#a").click()
+    """
+    assert journey(reference, reference) == []
+
+
+def test_reference_a_b_a_against_a_a_b_is_changed_journey_at_step_two() -> None:
+    reference = """
+        await page.locator("#a").click()
+        await page.locator("#b").click()
+        await page.locator("#a").click()
+    """
+    fix = """
+        await page.locator("#a").click()
+        await page.locator("#a").click()
+        await page.locator("#b").click()
+    """
+    findings = journey(fix, reference)
+    assert [f.tag for f in findings] == ["changed-journey"]
+    assert findings[0].line == 3
+    assert findings[0].detail.startswith("path step 2:")
+
+
+def test_reorder_is_reported_beside_changed_setup() -> None:
+    reference = """
+        await context.tracing.start(screenshots=True)
+        await page.locator("#a").click()
+        await page.locator("#b").click()
+    """
+    fix = """
+        await context.tracing.start(screenshots=False)
+        await page.locator("#b").click()
+        await page.locator("#a").click()
+    """
+    assert tags(fix, reference) == ["changed-journey", "changed-setup"]
+
+
+def test_reorder_detail_names_both_step_numbers_and_the_reference_line() -> None:
+    fix = """
+        await page.locator("#b").click()
+        await page.locator("#a").click()
+    """
+    detail = journey(fix, TWO_CLICKS)[0].detail
+    assert detail == (
+        "path step 1: the fix's action click on page.locator('#b') is the reference's "
+        "path step 2 (reference line 3), a reordered step"
+    )
+
+
 # --- rule 2: aligned path steps -----------------------------------------------
 
 

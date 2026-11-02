@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from scriptfix import RUBRIC
 from scriptfix.case import load_case
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVAL_01 = REPO_ROOT / "evals" / "01-playwright-python-basic"
 
 VALID: dict[str, str] = {
-    "rubric": '"script-fix-v0"',
+    "rubric": f'"{RUBRIC}"',
     "expected": '"fix"',
     "issue": '["locator-text"]',
     "origin": '"handmade"',

@@ -1,6 +1,8 @@
 # grader-01bc — rubric v1, the red-team rulings, and a regrade command
 
-**Status:** DRAFT
+**Status:** implemented 2026-11-02, `e3164fd..` on branch
+`worktree-oversee+grader-01bc` (oversee run; follow-up:
+`grader-01bc.hardening-round-2.follow-up.md`)
 **Requested:** 2026-11-01. Drafted at `8468a63` by
 `/zmh-producer:backlog-plan-gen`. Sources:
 - the CD's three rubric rulings (2026-11-01, DONE.md, TODO.md § Next

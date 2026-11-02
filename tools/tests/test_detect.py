@@ -7,7 +7,9 @@ import textwrap
 import pytest
 
 from scriptfix.detect import (
+    PAGE_SCRIPT_NAMES,
     TAG_BROAD_PATTERN,
+    TAG_CHANGED_PAGE,
     TAG_CONDITIONAL_STEP,
     TAG_FIRST_NTH,
     TAG_FORCE,
@@ -22,6 +24,7 @@ from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
 from scriptfix.journey import (
     TAG_ADDED_ASSERTION,
     TAG_CHANGED_JOURNEY,
+    TAG_CHANGED_SETUP,
     TAG_RETARGETED,
     TAG_WEAKENED_CHECK,
 )
@@ -489,6 +492,16 @@ def test_sleep_used_as_a_value(extra):
     assert found(with_extra(extra), fix) == []
 
 
+@pytest.mark.parametrize(
+    "extra", ['nap = getattr(time, "sleep")', 'w = getattr(page, "wait_for_timeout")']
+)
+def test_getattr_sleep_used_as_a_value(extra):
+    fix = with_extra(extra)
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert found(fix, fix) == []
+
+
 def test_sleep_name_imported_from_a_sleep_module_used_as_a_value():
     fix = "from time import sleep as pause\n" + with_extra("nap = pause")
     assert only(fix, TAG_SLEEP, SEVERITY_ZERO).line == line_of(fix, "nap = pause")
@@ -510,6 +523,77 @@ def test_other_attributes_and_stores_are_not_sleep_values():
     assert tags(with_extra("nap = asyncio.sleeper")) == []
     assert tags(with_extra("nap = clock.wait_for_timeouts")) == []
     assert tags(with_extra("page.sleep = 2")) == []
+
+
+LAUNCH = "browser = await playwright.chromium.launch(headless=False{})"
+
+
+def launch_script(options: str = "") -> str:
+    """The reference plus a ``launch(...)`` line with ``options`` after ``headless=False``."""
+    return with_extra(LAUNCH.format(options))
+
+
+def test_launch_slow_mo_is_a_sleep():
+    fix = launch_script(", slow_mo=2000")
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO, launch_script())
+    assert finding.line == line_of(fix, "slow_mo=2000")
+    assert "slow_mo=2000" in finding.detail
+
+
+@pytest.mark.parametrize("value", ["0", "0.0", "None"])
+def test_slow_mo_zero_or_none_is_not_a_sleep(value):
+    assert found(launch_script(f", slow_mo={value}"), launch_script()) == []
+
+
+def test_slow_mo_from_a_name_is_a_sleep():
+    fix = launch_script(", slow_mo=SLOW")
+    assert only(fix, TAG_SLEEP, SEVERITY_ZERO, launch_script()).line == line_of(fix, "SLOW")
+
+
+@pytest.mark.parametrize(
+    "options", [', **{"slow_mo": 500}', ", **dict(slow_mo=500)"], ids=["display", "call"]
+)
+def test_slow_mo_spelled_out_in_a_double_star_is_a_sleep(options):
+    finding = only(launch_script(options), TAG_SLEEP, SEVERITY_ZERO, launch_script())
+    assert "slow_mo=500" in finding.detail
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'await page.get_by_role("link").click(delay=500)',
+        'await page.get_by_role("link").dblclick(delay=500)',
+        'await page.get_by_role("link").press("A", delay=500)',
+        'await page.get_by_role("textbox").type("abc", delay=500)',
+        'await page.get_by_role("textbox").press_sequentially("abc", delay=500)',
+        "await page.mouse.click(1, 2, delay=500)",
+        'await page.keyboard.press("A", delay=10)',
+    ],
+)
+def test_action_delay_is_a_sleep(call):
+    fix = with_extra(call)
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "delay=")
+    assert "delay=" in finding.detail
+
+
+def test_action_delay_zero_is_not_a_sleep():
+    assert tags(with_extra('await page.get_by_role("link").click(delay=0)')) == []
+
+
+def test_delay_on_an_unclassified_call_is_a_sleep():
+    assert only(with_extra("helper(delay=5)"), TAG_SLEEP, SEVERITY_ZERO).line > 0
+
+
+def test_slow_mo_already_in_reference_is_fine():
+    assert found(launch_script(", slow_mo=500"), launch_script(", slow_mo=500")) == []
+
+
+def test_a_larger_slow_mo_than_the_reference_is_changed_setup_not_a_sleep():
+    reference = launch_script(", slow_mo=100")
+    fix = launch_script(", slow_mo=2000")
+    assert found(fix, reference) == []
+    assert {f.tag for f in check_static(reference, fix)} == {TAG_CHANGED_SETUP}
 
 
 # --- longer-timeout ----------------------------------------------------------
@@ -608,8 +692,8 @@ def test_double_star_dict_display_contributes_its_timeout():
 
 
 def test_double_star_dict_display_with_other_keys_and_an_assertion_limit():
-    assert tags(click_with('**{"delay": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
-    assert tags(click_with('**{"delay": 5}')) == []
+    assert tags(click_with('**{"speed": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"speed": 5}')) == []
     long_assertion = script(
         REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 10000})')
     )
@@ -629,11 +713,11 @@ def test_double_star_dict_call_is_read_like_the_display():
 
 def test_double_star_dict_call_that_may_hold_more_is_opaque():
     # Positional arguments, a nested ``**`` or a rebound ``dict`` can hold a timeout.
-    assert tags(click_with("**dict(base, delay=5)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(base, speed=5)")) == [TAG_LONGER_TIMEOUT]
     assert tags(click_with("**dict(**base)")) == [TAG_LONGER_TIMEOUT]
-    assert tags(click_with('**{**base, "delay": 5}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{**base, "speed": 5}')) == [TAG_LONGER_TIMEOUT]
     assert tags(click_with('**{"timeout": 1000, "timeout": 2000}')) == [TAG_LONGER_TIMEOUT]
-    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(delay=5))")) + (
+    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(speed=5))")) + (
         "\n\ndef dict(**kwargs):\n    return {'timeout': 60000}\n"
     )
     assert tags(rebound) == [TAG_LONGER_TIMEOUT]
@@ -791,6 +875,14 @@ def test_force_true_and_dispatch_event():
     assert finding.line == line_of(forced, "force=True")
     dispatched = with_extra('await page.get_by_role("link", name="Start").dispatch_event("click")')
     assert tags(dispatched) == [TAG_FORCE]
+
+
+def test_getattr_dispatch_event_is_a_force():
+    fix = with_extra(
+        'await getattr(page.get_by_role("link", name="Start"), "dispatch_event")("click")'
+    )
+    assert tags(fix) == [TAG_FORCE]
+    assert found(fix, fix) == []
 
 
 def test_force_with_a_variable_counts_and_force_false_does_not():
@@ -1071,6 +1163,138 @@ def test_exit_call_counts_once_and_other_exit_names_are_fine():
     assert tags("from helpers import exit\n" + with_extra("hook = exit")) == []
 
 
+# --- changed-page ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(PAGE_SCRIPT_NAMES))
+def test_each_page_script_name_called_on_page_is_a_changed_page(name):
+    fix = with_extra(f'await page.{name}("1")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, f"page.{name}")
+    assert f"{name} call" in finding.detail
+
+
+def test_page_script_names_are_the_rubric_nine():
+    assert len(PAGE_SCRIPT_NAMES) == 9
+
+
+def test_page_script_on_a_locator_or_frame_is_a_changed_page():
+    assert tags(with_extra('await locator.evaluate("el => el.remove()")')) == [TAG_CHANGED_PAGE]
+    assert tags(with_extra('await frame.evaluate("1")')) == [TAG_CHANGED_PAGE]
+
+
+def test_page_script_method_held_as_a_value_is_a_changed_page():
+    fix = with_extra('run_js = page.evaluate\nawait run_js("1")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert finding.line == line_of(fix, "run_js = page.evaluate")
+
+
+def test_page_script_reached_through_getattr_is_a_changed_page():
+    called = with_extra('await getattr(page, "evaluate")("1")')
+    held = with_extra('run_js = getattr(page, "evaluate")')
+    assert only(called, TAG_CHANGED_PAGE, SEVERITY_ZERO).line == line_of(called, "getattr")
+    assert "fix has 1, reference has 0" in found(called)[0].detail
+    assert only(held, TAG_CHANGED_PAGE, SEVERITY_ZERO).line == line_of(held, "getattr")
+    assert tags(with_extra('name = getattr(page, "title")')) == []
+
+
+def test_page_script_already_in_reference_is_fine_until_the_fix_adds_another():
+    reference = with_extra('await page.evaluate("1")')
+    assert found(with_extra('await page.evaluate("1")'), reference) == []
+    fix = with_extra('await page.evaluate("1")\nawait page.evaluate("2")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO, reference)
+    assert finding.line == line_of(fix, 'evaluate("2")')
+
+
+def test_add_init_script_is_both_changed_page_and_changed_setup():
+    fix = with_extra('await context.add_init_script("window.x = 1")')
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_PAGE, TAG_CHANGED_SETUP}
+    assert tags(fix) == [TAG_CHANGED_PAGE]
+
+
+def test_route_is_changed_setup_not_changed_page():
+    fix = with_extra('await page.route("**/*", handler)')
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_SETUP}
+    assert tags(fix) == []
+
+
+def test_expose_bridges_are_not_a_changed_page():
+    assert tags(with_extra('await page.expose_function("f", f)')) == []
+    assert tags(with_extra('await page.expose_binding("b", f)')) == []
+
+
+def test_page_script_stores_and_other_attributes_are_not_a_changed_page():
+    assert tags(with_extra("page.evaluate = patched")) == []
+    assert tags(with_extra("note = page.evaluated")) == []
+
+
+def test_sleep_comes_before_changed_page_in_the_findings():
+    fix = with_extra('await page.evaluate("1")\nawait asyncio.sleep(1)')
+    assert tags(fix) == [TAG_SLEEP, TAG_CHANGED_PAGE]
+
+
+# --- patched methods (changed-journey) ---------------------------------------
+
+
+def test_assigning_a_method_of_locator_is_changed_journey():
+    fix = with_extra("Locator.click = _skip")
+    finding = only(fix, TAG_CHANGED_JOURNEY, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "Locator.click = _skip")
+    assert "click replaced" in finding.detail
+    assert "fix has 1, reference has 0" in finding.detail
+
+
+def test_assigning_a_navigation_method_is_changed_journey():
+    assert tags(with_extra("page.goto = fake")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_setattr_and_delattr_of_a_step_method_are_changed_journey():
+    assert tags(with_extra('setattr(Locator, "click", f)')) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra('delattr(Locator, "click")')) == [TAG_CHANGED_JOURNEY]
+
+
+def test_replacing_a_matcher_or_expect_is_changed_journey():
+    assert tags(with_extra("Locator.to_be_visible = ok")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("playwright.async_api.expect = fake")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("Locator.not_to_be_hidden = ok")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_replacing_a_wait_method_is_changed_journey():
+    assert tags(with_extra("Page.wait_for_timeout = f")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_patch_in_a_tuple_target_or_augmented_or_del_is_changed_journey():
+    assert tags(with_extra("(Locator.click, n) = (f, 1)")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("Locator.click += 1")) == [TAG_CHANGED_JOURNEY]
+    assert tags(with_extra("del Locator.click")) == [TAG_CHANGED_JOURNEY]
+
+
+def test_assigning_other_attributes_is_not_a_patched_method():
+    assert tags(with_extra("obj.count = 1")) == []
+    assert tags(with_extra('self.title = "x"')) == []
+    assert tags(with_extra('setattr(o, "name", 1)')) == []
+    assert tags(with_extra('delattr(o, "name")')) == []
+
+
+def test_reading_a_step_method_is_not_a_patched_method():
+    assert tags(with_extra("ref = Locator.click")) == []
+    assert tags(with_extra('ref = getattr(Locator, "click")')) == []
+
+
+def test_patch_already_in_reference_is_fine_until_the_fix_adds_another():
+    reference = with_extra("Locator.click = _skip")
+    assert found(with_extra("Locator.click = _skip"), reference) == []
+    fix = with_extra("Locator.click = _skip\nLocator.dblclick = _skip")
+    finding = only(fix, TAG_CHANGED_JOURNEY, SEVERITY_ZERO, reference)
+    assert finding.line == line_of(fix, "Locator.dblclick")
+
+
+def test_patched_method_comes_after_force_in_the_findings():
+    fix = with_extra('Locator.click = _skip\nawait page.locator("a").click(force=True)')
+    assert tags(fix) == [TAG_FORCE, TAG_CHANGED_JOURNEY]
+
+
 # --- new-wait ----------------------------------------------------------------
 
 
@@ -1094,6 +1318,12 @@ def test_new_wait_new_in_fix(call):
 def test_wait_for_timeout_is_a_sleep_not_a_new_wait():
     fix = with_extra("await page.wait_for_timeout(100)")
     assert tags(fix) == [TAG_SLEEP]
+
+
+def test_getattr_wait_is_a_new_wait():
+    fix = with_extra('await getattr(page, "wait_for_load_state")()')
+    assert tags(fix) == [TAG_NEW_WAIT]
+    assert found(fix, fix) == []
 
 
 def test_new_wait_already_in_reference():
@@ -1167,6 +1397,20 @@ def test_first_last_and_nth():
     assert only(first, TAG_FIRST_NTH, SEVERITY_SMELL).line == line_of(first, ".first")
     assert tags(last) == [TAG_FIRST_NTH]
     assert tags(nth) == [TAG_FIRST_NTH]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        'await getattr(page.get_by_role("link"), "nth")(0).click()',
+        'first = getattr(page.get_by_role("link"), "first")',
+        'last = getattr(page.get_by_role("link"), "last")',
+    ],
+)
+def test_getattr_first_last_and_nth(extra):
+    fix = with_extra(extra)
+    assert tags(fix) == [TAG_FIRST_NTH]
+    assert found(fix, fix) == []
 
 
 def test_first_nth_already_in_reference():

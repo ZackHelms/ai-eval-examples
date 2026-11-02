@@ -6,7 +6,7 @@ listed for it. A file added without a label, or a label without a file, fails.
 Each corpus's case comes from its eval's ``grading/case.toml``. A fix case
 is graded against the reference only (``check_static(reference, fix)``); an
 escalate case also passes the eval's ``inputs/script.py`` as ``input_src``
-with ``expected="escalate"``, so its labels follow rubric-v0 § Escalate
+with ``expected="escalate"``, so its labels follow rubric-v1 § Escalate
 cases (the blocked step is kept or removed, never retargeted).
 """
 

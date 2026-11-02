@@ -8,8 +8,8 @@ sleep or wait) is never a finding. Occurrences are compared as a multiset of
 doesn't have, not just at the first one.
 
 Detection is syntactic and walks the whole module. The tags, severities and
-the meaning of each construct are defined by rubric-v0.md ("Rejected
-constructs"); the classification tables are shared with ``steps``, and a
+the meaning of each construct are defined by rubric-v1.md ("Fake-fix
+patterns"); the classification tables are shared with ``steps``, and a
 call is a step here exactly when ``steps.classify_module`` says so, so the
 journey and the detectors never disagree on what a step is.
 """
@@ -27,11 +27,15 @@ from scriptfix.findings import (
     SEVERITY_ZERO,
     Finding,
 )
+from scriptfix.journey import TAG_CHANGED_JOURNEY
 from scriptfix.steps import (
+    ACTIONS,
     KIND_ACTION,
     KIND_ASSERTION,
     KIND_NAVIGATION,
+    NAVIGATION,
     TIMEOUT_SETTERS,
+    WAITS,
     ModuleFacts,
     call_key,
     call_name,
@@ -45,6 +49,7 @@ TAG_LONGER_TIMEOUT = "longer-timeout"
 TAG_FORCE = "force"
 TAG_CONDITIONAL_STEP = "conditional-step"
 TAG_FORCED_EXIT = "forced-exit"
+TAG_CHANGED_PAGE = "changed-page"
 TAG_NEW_WAIT = "new-wait"
 TAG_BROAD_PATTERN = "broad-pattern"
 TAG_FIRST_NTH = "first-nth"
@@ -55,6 +60,28 @@ DEFAULT_TIMEOUT_MS = 30000
 DEFAULT_ASSERTION_TIMEOUT_MS = 5000
 DEFAULT_TIMEOUT_SETTERS = frozenset({"set_default_timeout", "set_default_navigation_timeout"})
 
+# Methods that run script or markup in the page under test. The grader can't
+# read that JavaScript, so a call to any of them counts, on any receiver.
+# ``route`` and the ``expose_*`` bridges stay out: they don't run script in
+# the page.
+PAGE_SCRIPT_NAMES = frozenset(
+    {
+        "evaluate",
+        "evaluate_handle",
+        "evaluate_all",
+        "eval_on_selector",
+        "eval_on_selector_all",
+        "add_script_tag",
+        "add_style_tag",
+        "add_init_script",
+        "set_content",
+    }
+)
+# Methods a fix can replace to fake a step: the navigation, action and wait
+# names, ``expect``, and any ``to_*``/``not_to_*`` matcher (see
+# ``_is_patchable``). Setup and tracing names are left out: replacing them
+# fakes no step.
+PATCHABLE_NAMES = NAVIGATION | ACTIONS | WAITS | frozenset({"expect"})
 NEW_WAIT_NAMES = frozenset(
     {
         "wait_for_load_state",
@@ -81,6 +108,9 @@ _EXIT_CALLS = frozenset({("sys", "exit"), ("os", "_exit"), (None, "exit"), (None
 # Sleep functions as (module, name), for a name from-imported from them.
 _SLEEP_FUNCTIONS = frozenset({("time", "sleep"), ("asyncio", "sleep")})
 _MAX_KEY_DETAIL = 70
+# Keyword arguments that pause every operation (``launch``) or each click or
+# key press (``click``, ``press``, ...) for a fixed time.
+_PAUSE_KWARGS = frozenset({"slow_mo", "delay"})
 
 
 @dataclass(frozen=True)
@@ -298,6 +328,13 @@ def _swallowed_errors(module: _Module) -> list[_Hit]:
     return sorted(hits, key=lambda h: h.line)
 
 
+def _is_zero_pause(value: ast.expr) -> bool:
+    """True for the literals ``0``, ``0.0`` and ``None``, the only values that pause nothing."""
+    if isinstance(value, ast.Constant) and value.value is None:
+        return True
+    return _number(value) == 0
+
+
 def _sleeps(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
@@ -305,12 +342,24 @@ def _sleeps(module: _Module) -> list[_Hit]:
         name = module.qualified(call)[1]
         if name == "sleep" or (isinstance(func, ast.Attribute) and func.attr == "wait_for_timeout"):
             hits.append(_Hit(_key(call), call.lineno, f"{name} call"))
+        # A launch's ``slow_mo`` and an action's ``delay`` pause without
+        # waiting for the page; they count on any call, classified or not.
+        named, _ = module.keywords(call)
+        for key, value in named:
+            if key in _PAUSE_KWARGS and not _is_zero_pause(value):
+                hits.append(_Hit(_key(call), call.lineno, f"{key}={_key(value)}"))
+                break
     # A sleep function passed around or bound to a name (``nap = asyncio.sleep``).
     for node in ast.walk(module.tree):
-        if id(node) in module.called or not isinstance(getattr(node, "ctx", None), ast.Load):
+        if id(node) in module.called:
             continue
-        if (isinstance(node, ast.Attribute) and node.attr in ("sleep", "wait_for_timeout")) or (
-            isinstance(node, ast.Name) and module.qualify(node) in _SLEEP_FUNCTIONS
+        # ``getattr(time, "sleep")`` bound or passed, not called.
+        if isinstance(node, ast.Call):
+            if module.facts.getattr_name(node) in ("sleep", "wait_for_timeout"):
+                hits.append(_Hit(_key(node), node.lineno, "sleep used as a value"))
+        elif isinstance(getattr(node, "ctx", None), ast.Load) and (
+            (isinstance(node, ast.Attribute) and node.attr in ("sleep", "wait_for_timeout"))
+            or (isinstance(node, ast.Name) and module.qualify(node) in _SLEEP_FUNCTIONS)
         ):
             hits.append(_Hit(_key(node), node.lineno, "sleep used as a value"))
     return sorted(hits, key=lambda h: h.line)
@@ -375,6 +424,7 @@ def _forces(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
         named, _ = module.keywords(call)
+        func = module.callee(call)
         forced = [
             value
             for key, value in named
@@ -382,7 +432,7 @@ def _forces(module: _Module) -> list[_Hit]:
         ]
         if forced:
             hits.append(_Hit(_key(call), call.lineno, f"force={_key(forced[0])}"))
-        elif isinstance(call.func, ast.Attribute) and call.func.attr == "dispatch_event":
+        elif isinstance(func, ast.Attribute) and func.attr == "dispatch_event":
             hits.append(_Hit(_key(call), call.lineno, "dispatch_event call"))
     return hits
 
@@ -455,12 +505,71 @@ def _forced_exits(module: _Module) -> list[_Hit]:
     return sorted(hits, key=lambda h: h.line)
 
 
+def _page_scripts(module: _Module) -> list[_Hit]:
+    hits = []
+    for call in module.calls():
+        func = module.callee(call)
+        if isinstance(func, ast.Attribute) and func.attr in PAGE_SCRIPT_NAMES:
+            hits.append(_Hit(_key(call), call.lineno, f"{func.attr} call"))
+    for node in ast.walk(module.tree):
+        # The method held as a value (``run_js = page.evaluate``); a called
+        # one is a hit above.
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.ctx, ast.Load)
+            and node.attr in PAGE_SCRIPT_NAMES
+            and id(node) not in module.called
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.attr} used as a value"))
+        # ``getattr(page, "evaluate")`` held, not called (a called one is read
+        # through ``module.callee`` above).
+        elif isinstance(node, ast.Call) and id(node) not in module.called:
+            name = module.facts.getattr_name(node)
+            if name in PAGE_SCRIPT_NAMES:
+                hits.append(_Hit(_key(node), node.lineno, f"{name} used as a value"))
+    return sorted(hits, key=lambda h: h.line)
+
+
+def _is_patchable(name: str) -> bool:
+    return name in PATCHABLE_NAMES or name.startswith(("to_", "not_to_"))
+
+
+def _patched_methods(module: _Module) -> list[_Hit]:
+    """A Playwright method replaced or removed: ``Locator.click = f``, ``setattr(...)``.
+
+    Every call to a replaced method stops doing its step, which is a changed
+    journey however the steps read. Only stores and deletes count; reading
+    ``Locator.click`` is not a patch.
+    """
+    hits = []
+    for node in ast.walk(module.tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.ctx, (ast.Store, ast.Del))
+            and _is_patchable(node.attr)
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.attr} replaced"))
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in ("setattr", "delattr")
+            and len(node.args) >= 2
+            and not isinstance(node.args[0], ast.Starred)
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+            and _is_patchable(node.args[1].value)
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.func.id} of {node.args[1].value}"))
+    return sorted(hits, key=lambda h: h.line)
+
+
 def _new_waits(module: _Module) -> list[_Hit]:
-    return [
-        _Hit(_key(call), call.lineno, f"{call.func.attr} call")
-        for call in module.calls()
-        if isinstance(call.func, ast.Attribute) and call.func.attr in NEW_WAIT_NAMES
-    ]
+    hits = []
+    for call in module.calls():
+        func = module.callee(call)
+        if isinstance(func, ast.Attribute) and func.attr in NEW_WAIT_NAMES:
+            hits.append(_Hit(_key(call), call.lineno, f"{func.attr} call"))
+    return hits
 
 
 def _is_broad(node: ast.AST) -> bool:
@@ -510,12 +619,15 @@ def _first_nth(module: _Module) -> list[_Hit]:
             and node.attr in ("first", "last")
         ):
             hits.append(_Hit(_key(node), node.lineno, f".{node.attr}"))
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "nth"
-        ):
-            hits.append(_Hit(_key(node), node.lineno, ".nth(...)"))
+        elif isinstance(node, ast.Call):
+            func = module.callee(node)
+            if isinstance(func, ast.Attribute) and func.attr == "nth":
+                hits.append(_Hit(_key(node), node.lineno, ".nth(...)"))
+            # ``getattr(loc, "first")`` reads like ``loc.first``.
+            else:
+                name = module.facts.getattr_name(node)
+                if name in ("first", "last"):
+                    hits.append(_Hit(_key(node), node.lineno, f".{name}"))
     return sorted(hits, key=lambda h: h.line)
 
 
@@ -525,8 +637,10 @@ _DETECTORS: tuple[tuple[str, str, _Collector], ...] = (
     (TAG_SLEEP, SEVERITY_ZERO, _sleeps),
     (TAG_LONGER_TIMEOUT, SEVERITY_ZERO, _longer_timeouts),
     (TAG_FORCE, SEVERITY_ZERO, _forces),
+    (TAG_CHANGED_JOURNEY, SEVERITY_ZERO, _patched_methods),
     (TAG_CONDITIONAL_STEP, SEVERITY_ZERO, _conditional_steps),
     (TAG_FORCED_EXIT, SEVERITY_ZERO, _forced_exits),
+    (TAG_CHANGED_PAGE, SEVERITY_ZERO, _page_scripts),
     (TAG_NEW_WAIT, SEVERITY_JUDGE, _new_waits),
     (TAG_BROAD_PATTERN, SEVERITY_JUDGE, _broad_patterns),
     (TAG_FIRST_NTH, SEVERITY_SMELL, _first_nth),
