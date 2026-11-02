@@ -89,7 +89,7 @@ $resolvedVenvDir = $VenvDir ? [IO.Path]::GetFullPath($VenvDir, $PWD.Path) : $nul
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
 
-    $pythonVersion = '3.12'            # repo pin; ADR pending (TODO.md § Needs Zack)
+    $pythonVersion = '3.12'            # repo pin (ADR-0002)
     $browsers      = @('chromium')     # Playwright browsers the current evals use
     $repoRoot      = $PSScriptRoot
     $isDefaultVenv = -not $resolvedVenvDir

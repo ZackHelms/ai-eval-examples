@@ -18,9 +18,10 @@ changes beat large ones.
    (`architecture.md`).
 2. **Self-containment** — every prompt placeholder resolves under
    `inputs/`; no absolute paths; the eval runs when copied out alone.
-3. **Pin compliance** — no load against public sites; `<FILL-IN:
-   static-reviewer checklist — Python/Playwright version and API pins once
-   the level-set decides them>`.
+3. **Pin compliance** — no load against public sites; Python 3.12 and
+   `playwright==1.64.1` change only by a superseding ADR (ADR-0002);
+   `<FILL-IN: Playwright API pins (sync vs async, browser channel) once
+   decided>`.
 4. **Reproducibility** — fixtures are captured, not hand-edited, and say
    how they were produced.
 5. **Correctness & edge cases** — the reference fix actually fixes the

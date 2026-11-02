@@ -36,8 +36,8 @@ avoid premature optimization.
 - **Tech stack:** Markdown eval specs + per-eval fixtures; evals are
   Python + Playwright, single-user, in a repo-local venv. No Locust or
   other multi-user runner for now (CD, 2026-10-31: single-user experiments
-  first). `<FILL-IN: pin via an ADR at the first-eval level-set — Python
-  version (leaning 3.12), venv location, Playwright version, and why>`.
+  first). Python 3.12 in `.venv\` (built by `.\01-setup-env.ps1`) and
+  `playwright==1.64.1`, recorded with codegen: ADR-0002.
 - **Load-test safety:** never run multi-user or load tests against
   third-party public sites — anything above 1 user × 1 iteration targets a
   local (localhost) target only. Public sites (e.g. playwright.dev) are for
@@ -115,7 +115,8 @@ DONE.md                   # completed-work log
   workflows/    deterministic processes (plan-oversee-cycle, …)
   checklists/   per-workflow completion checklists
   templates/    plan / ADR / agent templates
-  adr/          architecture decision records (ADR-0001: script-fix rubric)
+  adr/          architecture decision records (ADR-0001: script-fix rubric;
+                ADR-0002: stack pins)
   notes/        reference notes (test-site element inventory)
   plans/        feature plans (implemented plans archive to plans/DONE/)
   metrics/      oversee outcome ledger (task-tier routing data)
@@ -156,8 +157,9 @@ and checkable: the reference fix passes, the broken input fails.
 Markdown eval specs + per-eval Python/Playwright fixtures · pwsh dev host
 — the toolchain lives in `D:\gitrepos\ai-eval-examples`. Single-user only
 for now; a multi-user approach is revisited after single-user experiments
-(CD, 2026-10-31). `<FILL-IN: the record+codegen workflow — decided at the
-first-eval level-set>`.
+(CD, 2026-10-31). Scripts are recorded with `playwright codegen --target
+python-async` against playwright.dev, and cases are derived from them by
+recipe (`.\10-make-case.ps1`): ADR-0002.
 
 ## Conventions
 
