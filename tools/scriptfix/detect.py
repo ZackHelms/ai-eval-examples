@@ -45,6 +45,7 @@ TAG_LONGER_TIMEOUT = "longer-timeout"
 TAG_FORCE = "force"
 TAG_CONDITIONAL_STEP = "conditional-step"
 TAG_FORCED_EXIT = "forced-exit"
+TAG_CHANGED_PAGE = "changed-page"
 TAG_NEW_WAIT = "new-wait"
 TAG_BROAD_PATTERN = "broad-pattern"
 TAG_FIRST_NTH = "first-nth"
@@ -55,6 +56,23 @@ DEFAULT_TIMEOUT_MS = 30000
 DEFAULT_ASSERTION_TIMEOUT_MS = 5000
 DEFAULT_TIMEOUT_SETTERS = frozenset({"set_default_timeout", "set_default_navigation_timeout"})
 
+# Methods that run script or markup in the page under test. The grader can't
+# read that JavaScript, so a call to any of them counts, on any receiver.
+# ``route`` and the ``expose_*`` bridges stay out: they don't run script in
+# the page.
+PAGE_SCRIPT_NAMES = frozenset(
+    {
+        "evaluate",
+        "evaluate_handle",
+        "evaluate_all",
+        "eval_on_selector",
+        "eval_on_selector_all",
+        "add_script_tag",
+        "add_style_tag",
+        "add_init_script",
+        "set_content",
+    }
+)
 NEW_WAIT_NAMES = frozenset(
     {
         "wait_for_load_state",
@@ -81,6 +99,9 @@ _EXIT_CALLS = frozenset({("sys", "exit"), ("os", "_exit"), (None, "exit"), (None
 # Sleep functions as (module, name), for a name from-imported from them.
 _SLEEP_FUNCTIONS = frozenset({("time", "sleep"), ("asyncio", "sleep")})
 _MAX_KEY_DETAIL = 70
+# Keyword arguments that pause every operation (``launch``) or each click or
+# key press (``click``, ``press``, ...) for a fixed time.
+_PAUSE_KWARGS = frozenset({"slow_mo", "delay"})
 
 
 @dataclass(frozen=True)
@@ -298,6 +319,13 @@ def _swallowed_errors(module: _Module) -> list[_Hit]:
     return sorted(hits, key=lambda h: h.line)
 
 
+def _is_zero_pause(value: ast.expr) -> bool:
+    """True for the literals ``0``, ``0.0`` and ``None``, the only values that pause nothing."""
+    if isinstance(value, ast.Constant) and value.value is None:
+        return True
+    return _number(value) == 0
+
+
 def _sleeps(module: _Module) -> list[_Hit]:
     hits = []
     for call in module.calls():
@@ -305,6 +333,13 @@ def _sleeps(module: _Module) -> list[_Hit]:
         name = module.qualified(call)[1]
         if name == "sleep" or (isinstance(func, ast.Attribute) and func.attr == "wait_for_timeout"):
             hits.append(_Hit(_key(call), call.lineno, f"{name} call"))
+        # A launch's ``slow_mo`` and an action's ``delay`` pause without
+        # waiting for the page; they count on any call, classified or not.
+        named, _ = module.keywords(call)
+        for key, value in named:
+            if key in _PAUSE_KWARGS and not _is_zero_pause(value):
+                hits.append(_Hit(_key(call), call.lineno, f"{key}={_key(value)}"))
+                break
     # A sleep function passed around or bound to a name (``nap = asyncio.sleep``).
     for node in ast.walk(module.tree):
         if id(node) in module.called or not isinstance(getattr(node, "ctx", None), ast.Load):
@@ -455,6 +490,31 @@ def _forced_exits(module: _Module) -> list[_Hit]:
     return sorted(hits, key=lambda h: h.line)
 
 
+def _page_scripts(module: _Module) -> list[_Hit]:
+    hits = []
+    for call in module.calls():
+        func = module.callee(call)
+        if isinstance(func, ast.Attribute) and func.attr in PAGE_SCRIPT_NAMES:
+            hits.append(_Hit(_key(call), call.lineno, f"{func.attr} call"))
+    for node in ast.walk(module.tree):
+        # The method held as a value (``run_js = page.evaluate``); a called
+        # one is a hit above.
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.ctx, ast.Load)
+            and node.attr in PAGE_SCRIPT_NAMES
+            and id(node) not in module.called
+        ):
+            hits.append(_Hit(_key(node), node.lineno, f"{node.attr} used as a value"))
+        # ``getattr(page, "evaluate")`` held, not called (a called one is read
+        # through ``module.callee`` above).
+        elif isinstance(node, ast.Call) and id(node) not in module.called:
+            name = module.facts.getattr_name(node)
+            if name in PAGE_SCRIPT_NAMES:
+                hits.append(_Hit(_key(node), node.lineno, f"{name} used as a value"))
+    return sorted(hits, key=lambda h: h.line)
+
+
 def _new_waits(module: _Module) -> list[_Hit]:
     return [
         _Hit(_key(call), call.lineno, f"{call.func.attr} call")
@@ -527,6 +587,7 @@ _DETECTORS: tuple[tuple[str, str, _Collector], ...] = (
     (TAG_FORCE, SEVERITY_ZERO, _forces),
     (TAG_CONDITIONAL_STEP, SEVERITY_ZERO, _conditional_steps),
     (TAG_FORCED_EXIT, SEVERITY_ZERO, _forced_exits),
+    (TAG_CHANGED_PAGE, SEVERITY_ZERO, _page_scripts),
     (TAG_NEW_WAIT, SEVERITY_JUDGE, _new_waits),
     (TAG_BROAD_PATTERN, SEVERITY_JUDGE, _broad_patterns),
     (TAG_FIRST_NTH, SEVERITY_SMELL, _first_nth),

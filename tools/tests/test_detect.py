@@ -7,7 +7,9 @@ import textwrap
 import pytest
 
 from scriptfix.detect import (
+    PAGE_SCRIPT_NAMES,
     TAG_BROAD_PATTERN,
+    TAG_CHANGED_PAGE,
     TAG_CONDITIONAL_STEP,
     TAG_FIRST_NTH,
     TAG_FORCE,
@@ -22,6 +24,7 @@ from scriptfix.findings import SEVERITY_JUDGE, SEVERITY_SMELL, SEVERITY_ZERO
 from scriptfix.journey import (
     TAG_ADDED_ASSERTION,
     TAG_CHANGED_JOURNEY,
+    TAG_CHANGED_SETUP,
     TAG_RETARGETED,
     TAG_WEAKENED_CHECK,
 )
@@ -512,6 +515,77 @@ def test_other_attributes_and_stores_are_not_sleep_values():
     assert tags(with_extra("page.sleep = 2")) == []
 
 
+LAUNCH = "browser = await playwright.chromium.launch(headless=False{})"
+
+
+def launch_script(options: str = "") -> str:
+    """The reference plus a ``launch(...)`` line with ``options`` after ``headless=False``."""
+    return with_extra(LAUNCH.format(options))
+
+
+def test_launch_slow_mo_is_a_sleep():
+    fix = launch_script(", slow_mo=2000")
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO, launch_script())
+    assert finding.line == line_of(fix, "slow_mo=2000")
+    assert "slow_mo=2000" in finding.detail
+
+
+@pytest.mark.parametrize("value", ["0", "0.0", "None"])
+def test_slow_mo_zero_or_none_is_not_a_sleep(value):
+    assert found(launch_script(f", slow_mo={value}"), launch_script()) == []
+
+
+def test_slow_mo_from_a_name_is_a_sleep():
+    fix = launch_script(", slow_mo=SLOW")
+    assert only(fix, TAG_SLEEP, SEVERITY_ZERO, launch_script()).line == line_of(fix, "SLOW")
+
+
+@pytest.mark.parametrize(
+    "options", [', **{"slow_mo": 500}', ", **dict(slow_mo=500)"], ids=["display", "call"]
+)
+def test_slow_mo_spelled_out_in_a_double_star_is_a_sleep(options):
+    finding = only(launch_script(options), TAG_SLEEP, SEVERITY_ZERO, launch_script())
+    assert "slow_mo=500" in finding.detail
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'await page.get_by_role("link").click(delay=500)',
+        'await page.get_by_role("link").dblclick(delay=500)',
+        'await page.get_by_role("link").press("A", delay=500)',
+        'await page.get_by_role("textbox").type("abc", delay=500)',
+        'await page.get_by_role("textbox").press_sequentially("abc", delay=500)',
+        "await page.mouse.click(1, 2, delay=500)",
+        'await page.keyboard.press("A", delay=10)',
+    ],
+)
+def test_action_delay_is_a_sleep(call):
+    fix = with_extra(call)
+    finding = only(fix, TAG_SLEEP, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, "delay=")
+    assert "delay=" in finding.detail
+
+
+def test_action_delay_zero_is_not_a_sleep():
+    assert tags(with_extra('await page.get_by_role("link").click(delay=0)')) == []
+
+
+def test_delay_on_an_unclassified_call_is_a_sleep():
+    assert only(with_extra("helper(delay=5)"), TAG_SLEEP, SEVERITY_ZERO).line > 0
+
+
+def test_slow_mo_already_in_reference_is_fine():
+    assert found(launch_script(", slow_mo=500"), launch_script(", slow_mo=500")) == []
+
+
+def test_a_larger_slow_mo_than_the_reference_is_changed_setup_not_a_sleep():
+    reference = launch_script(", slow_mo=100")
+    fix = launch_script(", slow_mo=2000")
+    assert found(fix, reference) == []
+    assert {f.tag for f in check_static(reference, fix)} == {TAG_CHANGED_SETUP}
+
+
 # --- longer-timeout ----------------------------------------------------------
 
 
@@ -608,8 +682,8 @@ def test_double_star_dict_display_contributes_its_timeout():
 
 
 def test_double_star_dict_display_with_other_keys_and_an_assertion_limit():
-    assert tags(click_with('**{"delay": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
-    assert tags(click_with('**{"delay": 5}')) == []
+    assert tags(click_with('**{"speed": 5, "timeout": 60000}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{"speed": 5}')) == []
     long_assertion = script(
         REFERENCE_BODY.replace("to_be_visible()", 'to_be_visible(**{"timeout": 10000})')
     )
@@ -629,11 +703,11 @@ def test_double_star_dict_call_is_read_like_the_display():
 
 def test_double_star_dict_call_that_may_hold_more_is_opaque():
     # Positional arguments, a nested ``**`` or a rebound ``dict`` can hold a timeout.
-    assert tags(click_with("**dict(base, delay=5)")) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with("**dict(base, speed=5)")) == [TAG_LONGER_TIMEOUT]
     assert tags(click_with("**dict(**base)")) == [TAG_LONGER_TIMEOUT]
-    assert tags(click_with('**{**base, "delay": 5}')) == [TAG_LONGER_TIMEOUT]
+    assert tags(click_with('**{**base, "speed": 5}')) == [TAG_LONGER_TIMEOUT]
     assert tags(click_with('**{"timeout": 1000, "timeout": 2000}')) == [TAG_LONGER_TIMEOUT]
-    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(delay=5))")) + (
+    rebound = script(REFERENCE_BODY.replace(".click()", ".click(**dict(speed=5))")) + (
         "\n\ndef dict(**kwargs):\n    return {'timeout': 60000}\n"
     )
     assert tags(rebound) == [TAG_LONGER_TIMEOUT]
@@ -1069,6 +1143,77 @@ def test_exit_call_counts_once_and_other_exit_names_are_fine():
     assert tags(with_extra("hook = sys.exit_code")) == []
     assert tags(with_extra("sys.exit = patched")) == []
     assert tags("from helpers import exit\n" + with_extra("hook = exit")) == []
+
+
+# --- changed-page ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(PAGE_SCRIPT_NAMES))
+def test_each_page_script_name_called_on_page_is_a_changed_page(name):
+    fix = with_extra(f'await page.{name}("1")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO)
+    assert finding.line == line_of(fix, f"page.{name}")
+    assert f"{name} call" in finding.detail
+
+
+def test_page_script_names_are_the_rubric_nine():
+    assert len(PAGE_SCRIPT_NAMES) == 9
+
+
+def test_page_script_on_a_locator_or_frame_is_a_changed_page():
+    assert tags(with_extra('await locator.evaluate("el => el.remove()")')) == [TAG_CHANGED_PAGE]
+    assert tags(with_extra('await frame.evaluate("1")')) == [TAG_CHANGED_PAGE]
+
+
+def test_page_script_method_held_as_a_value_is_a_changed_page():
+    fix = with_extra('run_js = page.evaluate\nawait run_js("1")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO)
+    assert "used as a value" in finding.detail
+    assert finding.line == line_of(fix, "run_js = page.evaluate")
+
+
+def test_page_script_reached_through_getattr_is_a_changed_page():
+    called = with_extra('await getattr(page, "evaluate")("1")')
+    held = with_extra('run_js = getattr(page, "evaluate")')
+    assert only(called, TAG_CHANGED_PAGE, SEVERITY_ZERO).line == line_of(called, "getattr")
+    assert "fix has 1, reference has 0" in found(called)[0].detail
+    assert only(held, TAG_CHANGED_PAGE, SEVERITY_ZERO).line == line_of(held, "getattr")
+    assert tags(with_extra('name = getattr(page, "title")')) == []
+
+
+def test_page_script_already_in_reference_is_fine_until_the_fix_adds_another():
+    reference = with_extra('await page.evaluate("1")')
+    assert found(with_extra('await page.evaluate("1")'), reference) == []
+    fix = with_extra('await page.evaluate("1")\nawait page.evaluate("2")')
+    finding = only(fix, TAG_CHANGED_PAGE, SEVERITY_ZERO, reference)
+    assert finding.line == line_of(fix, 'evaluate("2")')
+
+
+def test_add_init_script_is_both_changed_page_and_changed_setup():
+    fix = with_extra('await context.add_init_script("window.x = 1")')
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_PAGE, TAG_CHANGED_SETUP}
+    assert tags(fix) == [TAG_CHANGED_PAGE]
+
+
+def test_route_is_changed_setup_not_changed_page():
+    fix = with_extra('await page.route("**/*", handler)')
+    assert {f.tag for f in check_static(REFERENCE, fix)} == {TAG_CHANGED_SETUP}
+    assert tags(fix) == []
+
+
+def test_expose_bridges_are_not_a_changed_page():
+    assert tags(with_extra('await page.expose_function("f", f)')) == []
+    assert tags(with_extra('await page.expose_binding("b", f)')) == []
+
+
+def test_page_script_stores_and_other_attributes_are_not_a_changed_page():
+    assert tags(with_extra("page.evaluate = patched")) == []
+    assert tags(with_extra("note = page.evaluated")) == []
+
+
+def test_sleep_comes_before_changed_page_in_the_findings():
+    fix = with_extra('await page.evaluate("1")\nawait asyncio.sleep(1)')
+    assert tags(fix) == [TAG_SLEEP, TAG_CHANGED_PAGE]
 
 
 # --- new-wait ----------------------------------------------------------------
