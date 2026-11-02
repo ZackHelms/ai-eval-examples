@@ -6,7 +6,7 @@
     judge, or report pass rates per subject.
 
 .DESCRIPTION
-    Wraps `python -m scriptfix grade|judge|calibrate|report` from the repo's
+    Wraps `python -m scriptfix grade|judge|calibrate|report|regrade` from the repo's
     venv.
 
     Grade mode (-Case and -Runs) grades the saved trial runs of one script-fix
@@ -38,13 +38,22 @@
     (-MaxTotalUsd). With -DryRun it prints the call count and asks nothing.
     Takes no -Case or -Runs.
 
+    Regrade mode (-Regrade, one -Case and -Runs) re-grades the case's recorded
+    trials from their saved fixes and transcripts without a single replay: it
+    checks that a grader change left the verdicts alone. Without -Write it
+    only checks and writes nothing (exit 1 on a changed verdict, or when a
+    run would need a replay). With -Write, and an older rubric in -From, it
+    records the runs under the current rubric and leaves every other line
+    alone; Python then prints a NEXT= line with the -Judge command for the
+    runs that await the judge. Each run keeps its own recorded subject.
+
     Report mode (-Report) prints, per case and subject, passes/valid, rate, the
     95% lower bound, pending and invalid counts and the most common tags. With
     no -Case it covers every eval that has a grading\trials.jsonl.
 
     Optional options are passed through only when given, so the Python CLI's
     defaults stay the single source of truth (see: .venv\Scripts\python.exe
-    -m scriptfix grade -h, judge -h, calibrate -h). Run the script; don't
+    -m scriptfix grade -h, judge -h, calibrate -h, regrade -h). Run the script; don't
     dot-source it (it exits with the Python exit code). Needs the venv from
     .\01-setup-env.ps1.
 
@@ -78,6 +87,23 @@
 
 .PARAMETER Report
     Print pass rates instead of grading.
+
+.PARAMETER Regrade
+    Re-grade the case's recorded trials without replaying (needs exactly one
+    -Case and -Runs). Checks only unless -Write is given.
+
+.PARAMETER From
+    With -Regrade, the rubric whose records are re-graded (Python default
+    applies: the current rubric, which -Write refuses), e.g. script-fix-v0.
+
+.PARAMETER Write
+    With -Regrade, record the runs under the current rubric when the check
+    finds no run that needs a replay. Needs an older rubric in -From.
+
+.PARAMETER RepoRoot
+    With -Regrade, the repository root the grader uses for its answer-key
+    rule (Python default applies). A relative path resolves against your
+    current folder.
 
 .PARAMETER Judge
     Judge the case's trials only, without grading or replaying (needs exactly
@@ -130,6 +156,15 @@
     List the judge's questions for runs 10 and 12 without asking any.
 
 .EXAMPLE
+    .\30-grade-trials.ps1 -Regrade -Case evals\01-playwright-python-basic -Runs 1-12 -From script-fix-v0
+    Check that runs 1-12, recorded under script-fix-v0, still grade the same
+    now, without replaying or writing anything.
+
+.EXAMPLE
+    .\30-grade-trials.ps1 -Regrade -Write -Case evals\01-playwright-python-basic -Runs 1-12 -From script-fix-v0
+    The same, then record the runs under the current rubric.
+
+.EXAMPLE
     .\30-grade-trials.ps1 -Calibrate -DryRun
     Print how many calls a full calibration would make, without making any.
 
@@ -148,6 +183,10 @@ param(
     [string]$Tools,
     [int]$Timeout,
     [switch]$Report,
+    [switch]$Regrade,
+    [string]$From,
+    [switch]$Write,
+    [string]$RepoRoot,
     [switch]$Judge,
     [switch]$NoJudge,
     [switch]$Calibrate,
@@ -182,21 +221,27 @@ if ($Items) { $Items = @($Items -split ',' | Where-Object { $_ }) }
 # In a session `-Runs 10,12` is an array; under `pwsh -File` it is one string.
 $runsText = $Runs -join ','
 
-# The mode is whichever of -Report, -Judge and -Calibrate is given; none means
-# grade mode. $PSBoundParameters is read here because the work block below
+# The mode is whichever of -Report, -Regrade, -Judge and -Calibrate is given;
+# none means grade mode. $PSBoundParameters is read here because the work block below
 # has its own.
 $samplesGiven = $PSBoundParameters.ContainsKey('Samples')
 $maxTotalUsdGiven = $PSBoundParameters.ContainsKey('MaxTotalUsd')
 $timeoutGiven = $PSBoundParameters.ContainsKey('Timeout')
-$modes = @(@($Report, $Judge, $Calibrate) | Where-Object { $_ })
-if ($modes.Count -gt 1) { Stop-Usage "Use only one of -Report, -Judge and -Calibrate." }
+$modes = @(@($Report, $Regrade, $Judge, $Calibrate) | Where-Object { $_ })
+if ($modes.Count -gt 1) { Stop-Usage "Use only one of -Report, -Regrade, -Judge and -Calibrate." }
 $gradeMode = $modes.Count -eq 0
 if ($NoJudge -and -not $gradeMode) { Stop-Usage "-NoJudge only applies to grade mode (-Case and -Runs)." }
 if (($samplesGiven -or $Items -or $maxTotalUsdGiven) -and -not $Calibrate) {
     Stop-Usage "-Samples, -Items and -MaxTotalUsd need -Calibrate."
 }
 if ($DryRun -and -not ($Judge -or $Calibrate)) { Stop-Usage "-DryRun needs -Judge or -Calibrate." }
+if (($From -or $Write -or $RepoRoot) -and -not $Regrade) { Stop-Usage "-From, -Write and -RepoRoot need -Regrade." }
 if ($Calibrate -and ($Case -or $Runs)) { Stop-Usage "-Calibrate takes no -Case or -Runs." }
+if ($Regrade) {
+    if (-not $Case) { Stop-Usage "Missing -Case (the eval directory to re-grade)." }
+    if ($Case.Count -ne 1) { Stop-Usage "-Regrade takes exactly one -Case (got $($Case.Count))." }
+    if (-not $Runs) { Stop-Usage "Missing -Runs (e.g. 1-12 or 1,3,5-7)." }
+}
 if ($Judge -and -not $Case) { Stop-Usage "Missing -Case (the eval directory to judge)." }
 if ($Judge -and $Case.Count -ne 1) { Stop-Usage "-Judge takes exactly one -Case (got $($Case.Count))." }
 if ($gradeMode) {
@@ -219,6 +264,8 @@ $trialsRootDir = $null
 if ($TrialsRoot) { $trialsRootDir = [IO.Path]::GetFullPath($TrialsRoot, $PWD.Path) }
 $projectsRootDir = $null
 if ($ProjectsRoot) { $projectsRootDir = [IO.Path]::GetFullPath($ProjectsRoot, $PWD.Path) }
+$repoRootDir = $null
+if ($RepoRoot) { $repoRootDir = [IO.Path]::GetFullPath($RepoRoot, $PWD.Path) }
 $claudePath = $null
 if ($Claude) { $claudePath = [IO.Path]::GetFullPath($Claude, $PWD.Path) }
 
@@ -240,12 +287,16 @@ $script:exitCode = 0
         return
     }
 
-    $subcommand = $Report ? 'report' : $Judge ? 'judge' : $Calibrate ? 'calibrate' : 'grade'
+    $subcommand = $Report ? 'report' : $Regrade ? 'regrade' : $Judge ? 'judge' : $Calibrate ? 'calibrate' : 'grade'
     $pyArgs = @('-m', 'scriptfix', $subcommand)
     foreach ($c in $caseDirs) { $pyArgs += @('--case', $c) }
     # Options in the order given; an empty value means "not given".
     $optional = @()
-    if ($gradeMode -or ($Judge -and $runsText)) { $optional += , @('--runs', $runsText) }
+    if ($gradeMode -or $Regrade -or ($Judge -and $runsText)) { $optional += , @('--runs', $runsText) }
+    if ($Regrade) {
+        $optional += , @('--from',      $From)
+        $optional += , @('--repo-root', $repoRootDir)
+    }
     # Options a mode doesn't take are left for Python to reject (exit 2).
     if (-not $Calibrate) {
         $optional += , @('--trials-root',   $trialsRootDir)
@@ -266,6 +317,7 @@ $script:exitCode = 0
         foreach ($item in $Items) { $pyArgs += @('--items', $item) }
         if ($maxTotalUsdGiven) { $pyArgs += @('--max-total-usd', $MaxTotalUsd.ToString([cultureinfo]::InvariantCulture)) }
     }
+    if ($Regrade -and $Write) { $pyArgs += '--write' }
     if ($DryRun) { $pyArgs += '--dry-run' }
 
     # Grade mode judges what it just graded, the same way `-Judge` would.
