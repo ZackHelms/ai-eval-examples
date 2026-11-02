@@ -85,48 +85,37 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Next
 
-- **Grader hardening, round 2** (grader-01bb's residue,
-  `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` § Deferred).
-  - **The CD's rubric rulings** (*Decided 2026-11-01*, DONE.md):
-    - `launch(slow_mo=…)` and an action's `delay=…` are fixed `sleep`s
-      (zero);
-    - a `page.evaluate` that rewrites the page under test gets a new zero
-      tag (its name is the plan's call).
+- **Grader hardening, round 2** (grader-01bc; the CD's rubric rulings of
+  2026-11-01 and grader-01bb's residue,
+  `.claude/plans/DONE/grader-01bb.hardening.follow-up.md` § Deferred):
+  - `rubric-v1.md`: `slow_mo` and an action's `delay` are `sleep`; script
+    or markup run in the page is a new zero tag, `changed-page`;
+  - 5 of the 7 red-team misses: swapped clicks and a replaced Playwright
+    method become `changed-journey`, and `delay`, a JS sleep and a JS
+    navigation are caught;
+  - the small residue (`getattr` in every detector, marker arguments, a
+    test name);
+  - `.\30-grade-trials.ps1 -Regrade`, which re-grades recorded trials
+    without replays. Eval 01's 12 trials are then re-graded under v1.
 
-    Both change the rubric's patterns, so the round opens with
-    `rubric-v1.md` (ADR-0001: a rubric change is a new file, and old trials
-    are re-graded from their saved fixes).
-  - 7 red-team misses still slip past the static checks:
-    - swapped clicks read as two judge `retargeted`, not
-      `changed-journey`;
-    - helpers aren't followed at call sites (an uncalled def, a helper
-      called under `if`);
-    - JS run through `page.evaluate` is opaque (a sleep, a navigation);
-    - a monkeypatched Playwright method;
-    - `delay=` (now ruled a `sleep`).
-  - The small residue:
-    - `getattr` in three more collectors;
-    - a misleading test name;
-    - marker arguments aren't searched;
-    - promote the static calibration (fake `replay_fn`) to a tested
-      command.
-
-  *Plannable now:* rubric-v1, the three rulings and the small residue. The
-  helper design needs a short design pass first. It can land before or
-  after the phase F pilot (trials re-grade from their saved fixes); the
-  pilot's real trials will show which other shapes models actually
-  produce.
+  7 tasks (sonnet) plus free live steps: no replays, and the judge answers
+  from its cache. It can land before or after the phase F pilot.
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/grader-01bc.hardening-round-2.md`
 - **Level-set ADR** (the CD adopted current practice, *Decided
-  2026-11-01*, DONE.md). Write ADR-0002 recording: Python 3.12 in a
-  repo-root `.venv` built by `01-setup-env.ps1`, with
-  `playwright==1.64.1`; the target policy (playwright.dev for 1-user
-  record/codegen and single replays only, a local test site for anything
-  more); codegen-recorded scripts. It records what's in use, so no version
-  changes. Then resolve the matching markers: `CLAUDE.md` (the stack pin
-  and the codegen workflow), the Python half of `coding.md`'s language
-  pin, the version half of `review.md`'s pin check, and
-  `01-setup-env.ps1`'s "ADR pending" comment. Docs-only and small:
-  `/zmh-producer:backlog-plan-gen level-set ADR`, or one sitting.
+  2026-11-01*, DONE.md): ADR-0002 records Python 3.12 in `.venv\`,
+  `playwright==1.64.1`, the target policy and codegen-recorded scripts.
+  The matching `<FILL-IN>`s in `CLAUDE.md`, `coding.md`, `review.md` and
+  `01-setup-env.ps1` then point at it. Docs only, one haiku task.
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/levelset-01.adr.md`
+- **Grader: follow helpers at their call sites** (the two red-team misses
+  grader-01bc leaves, `zero-uncalled-def` and `zero-if-around-helper`;
+  grader-01bb's follow-up § Deferred). The journey reads a def's steps
+  where it's defined, and the detectors don't treat a call to a helper
+  that holds steps as a step. A candidate design: inline helper bodies at
+  their call sites. It needs a short design pass before a plan, after
+  grader-01bc lands (same files).
 - **Local test site** (the CD's request, 2026-10-30; absorbs "Local load
   target"): a locally hosted web app (on the PC or in a container), more
   complex than playwright.dev, with a variety of elements in different
