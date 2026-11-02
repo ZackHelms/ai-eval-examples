@@ -7,10 +7,7 @@ Claude-maintained (see CLAUDE.md § Backlog SOP). Buckets: **In progress** ·
 
 ## In progress
 
-- **grader-01e: LLM judge** (oversee run, started 2026-11-01):
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01e.llm-judge.md`.
-  No commits landed yet; the run works on branch
-  `worktree-oversee+grader-01e`.
+*Nothing in progress.*
 
 At most **one** entry lives here, opened **before** a multi-commit task begins
 and closed in its last commit (CLAUDE.md § In-progress SOP).
@@ -32,43 +29,32 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   sidecar, `-SelfTest`, `.claude/plans/DONE/grader-01d.trial-runner.md`)
   → grader hardening (done 2026-11-01: the red-team agent, one shared
   call classification, the tool allowlist,
-  `.claude/plans/DONE/grader-01bb.hardening.md`) → **next:** E LLM judge →
-  F pilot. Absorbs the former § Next items Eval 01 grader, Capture script,
-  Trial runner script and Eval: impossible locator.
-- **grader-01 phase E: LLM judge.** Judges the `judge`-severity tags
-  (`retargeted`, `new-wait`, `changed-setup`, `broad-pattern`) and the
-  escalate cases' check 1, and resolves Eval 01's `pending-judge` runs 10
-  and 12. The calibration set is 29 items: the corpora's 24 judge
-  questions, plus 5 escalation responses the plan adds to case 06. At 5
-  samples each, that's 145 calls per calibration run, capped at $0.10 a
-  call and $6 a run.
-  - *Decided 2026-11-01 (the CD), on when a new wait or a setup change is
-    a cheat:* "“Ok unless it hides the failure” (the most lenient
-    approach, i would like to provide the list of things to consider
-    cheats (i.e. “doesnt meet my standards”) as i find them when
-    reviewing results."
-    - So the phase E plan adds a CD-maintained list of cheats that the
-      judge's prompt includes. It starts empty, and editing it changes the judge
-      version, so cached verdicts are re-asked.
-  - *Decided 2026-11-01:* the overseer runs the 5-out-of-5 calibration in
-    the oversee run: about 135 Sonnet 5.5 calls, roughly $2–5, capped per
-    call. It may revise the judge prompt once, and stops with a report if
-    items still miss.
-  - *Decided 2026-11-01:* the plan sets each judge item's right answer,
-    with a one-line reason from the case's evidence. The CD reviews the
-    list after the run, and any answer the CD flips becomes a new
-    calibration item.
-
-  *Depends on:* phase C and the grader hardening (both done; the hardening
-  kept Eval 01's runs 10 and 12 `pending-judge`).
-
-  **Plan ready (2026-11-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/grader-01e.llm-judge.md`
+  `.claude/plans/DONE/grader-01bb.hardening.md`) → E LLM judge (done
+  2026-11-01: `tools/scriptfix/judge.py`, the calibrated judge in
+  `rubrics/script-fix/judge/`, `.claude/plans/DONE/grader-01e.llm-judge.md`)
+  → **next:** F pilot. Absorbs the former § Next items Eval 01 grader,
+  Capture script, Trial runner script and Eval: impossible locator.
+- **grader-01 phase F: pilot.** Run the six cases against real models with
+  the full pipeline (trials, grade, judge, report).
+  *Depends on:* the CD's review of the judge's right answers (§ Needs
+  Zack). Next: `/zmh-producer:backlog-plan-gen phase F pilot`.
 
 <!-- --- -->
 
 ## Needs Zack
 
+- **Playtest: review the judge's right answers** (grader-01e, 2026-11-01).
+  The Lead Engineer set them; the judge passed calibration against them,
+  29 items 5 out of 5. They're in each case's `grading/corpus/judge.toml`,
+  each with a one-line `why`. The two likeliest to flip:
+  - the `smell-first.py` items (`cheat`): `.first` lands on the sidebar
+    link, which goes to the same page;
+  - `ok-exact-names.py`'s loose names (`ok`).
+
+  To flip one, edit its `answer` and `why`, then run
+  `.\30-grade-trials.ps1 -Calibrate` (about an hour, about $1.10). Also add
+  any cheat rulings to `rubrics/script-fix/judge/cheats.md` as you find
+  them. Unblocks phase F.
 - **Test-site element inventory: hands-on pass** (the CD's request,
   2026-10-31): the first pass is `.claude/notes/test-site-element-inventory.md`,
   generic by rule (CLAUDE.md § Project pins: generic content only). The
@@ -101,7 +87,10 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
     the script;
   - the grade records the sidecar's subject;
   - the stream log's `init` line lists only the seven allowlisted tools
-    (Read, Glob, Grep, Edit, Write, Bash, PowerShell; grader-01bb).
+    (Read, Glob, Grep, Edit, Write, Bash, PowerShell; grader-01bb);
+  - if the grade comes out `pending-judge`, the same `NEXT=` command then
+    asks the judge (about $0.01–0.03 a question) and prints each answer and
+    its reason (grader-01e; `-NoJudge` skips it).
 
   The launcher's self-test already passed live, before and after the
   allowlist (`.claude/plans/DONE/grader-01d.trial-runner.follow-up.md`
