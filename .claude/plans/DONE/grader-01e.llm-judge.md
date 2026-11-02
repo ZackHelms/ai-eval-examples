@@ -1,6 +1,8 @@
 # grader-01e — the LLM judge: prompts, calibration, verdicts
 
-**Status:** DRAFT
+**Status:** implemented 2026-11-01, `9a0b723..` on branch
+`worktree-oversee+grader-01e` (oversee run; follow-up:
+`grader-01e.llm-judge.follow-up.md`)
 **Requested:** 2026-10-30 (grader-01 § Phases, phase E); drafted
 2026-11-01 at `a29f4f0` by `/zmh-producer:backlog-plan-gen`, after
 grader-01bb integrated. The CD's three phase E decisions are in TODO.md

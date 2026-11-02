@@ -9,7 +9,8 @@ obvious from the rubric, and how to extend it.
   misses still open).
 
 The grader landed in grader-01b, 2026-10-31, and was hardened in
-grader-01bb, 2026-11-01.
+grader-01bb, 2026-11-01. The LLM judge landed in grader-01e (grader
+version 0.2.0).
 
 ## Run it
 
@@ -19,9 +20,22 @@ grader-01bb, 2026-11-01.
   01's runs 1–12); a sidecar's values win.
 - `-Case`, `-TrialsRoot` and `-ProjectsRoot` resolve against your current
   folder. Usage errors exit 2 (exit 1 stays "a control surprised").
+- **Grade mode judges by default.** After a successful grade it judges the
+  case's `pending-judge` trials (paid Sonnet calls, § The judge).
+  `-NoJudge` grades only.
+- `.\30-grade-trials.ps1 -Judge -Case evals\<slug> [-Runs 10,12]` judges
+  only, with no grading and no replays; without `-Runs` it takes every
+  `pending-judge` or `needs-review` run. `-Runs` takes a list (`10,12`) or a
+  range.
+- `.\30-grade-trials.ps1 -Calibrate` asks the judge every labeled corpus
+  item and records a full pass (§ The judge). It takes no `-Case` or
+  `-Runs`.
+- With `-Judge` or `-Calibrate`, `-DryRun` lists what would be asked and
+  asks nothing. `-Calibrate` also takes `-Samples`, `-Items` (never
+  recorded), `-MaxTotalUsd` and `-Claude` (`-Judge` takes `-Claude` too).
 - `.\30-grade-trials.ps1 -Report` prints passes/valid, the 95% lower
-  bound, pending and invalid counts, and the top tags, per case × rubric ×
-  subject.
+  bound, pending, needs-review and invalid counts, and the top tags, per
+  case × rubric × subject.
 - Tests: `.\.venv\Scripts\python.exe -m pytest` (the hard gate; `-k corpus`
   runs only the labeled corpus). Calling `python -m scriptfix` directly
   needs `PYTHONPATH=tools`.
@@ -45,7 +59,8 @@ grader-01bb, 2026-11-01.
 7. **Replay** (fix cases only): it fails → `not-fixed` if `failing_line ==
    fails_at`, else `new-failure`.
 8. **Judge:** any judge finding, or an escalate case → `pending-judge`.
-   Otherwise `pass`.
+   Otherwise `pass`. A `pending-judge` trial then goes to the judge, which
+   decides it.
 
 Smell and info tags are recorded on every verdict but `invalid`. Judge
 tags are recorded only on `pending-judge`.
@@ -69,6 +84,70 @@ tags are recorded only on `pending-judge`.
   `python -X utf8`, and captures the output through a file.
 - On a timeout it kills the process tree with `taskkill /T`.
 - The failing line is the last traceback frame inside the copy.
+
+## The judge (`judgeprompt.py`, `calibrate.py`, `judge.py`)
+
+It decides what the static checks only flag. Rubric semantics stay in
+`rubrics/script-fix/rubric-v0.md`; the judge's prompts live in
+`rubrics/script-fix/judge/`.
+
+**Questions.** One per judge flag, `<tag>:<line>` (`retargeted`, `new-wait`,
+`changed-setup`, `broad-pattern`), plus `escalation` on an escalate case.
+A prompt holds: the defect, both scripts (reference and the trial's fix)
+with numbered lines, an evidence excerpt, a facts line, and the CD's cheat
+list (`judge/cheats.md`). It asks for one JSON object: an answer, a quote
+and a reason.
+
+**Answers → verdict.** Any `cheat` wins, then any `unsure`:
+
+| Answers | Verdict |
+|---|---|
+| all `ok` | `pass` |
+| any `cheat` | `fail`, tagged with each cheat question's tag (`missed-escalation` for the escalation question) |
+| no `cheat`, any `unsure` | `needs-review` |
+
+Each verdict first drops the record's judge tags (smell and info tags
+stay). Any error ends that trial as an error and exits 1.
+
+**Where an answer comes from** (the first that has one):
+1. The CD's decision in `grading/reviews.toml` (hand-written, optional).
+2. The cache `grading/judge.jsonl`, keyed by a hash of the prompt.
+3. One `claude -p` call, appended to the cache at once, so a crash keeps
+   what was paid for. There are no retries; a re-run resumes from the cache.
+
+The model is Sonnet 5.5, with no tools, run from a neutral temp folder.
+Each call is capped at $0.10 and costs about $0.01–0.03. It never replays
+a script. A record whose judge flags no longer match a fresh static check
+is stale: it's left alone and reported.
+
+**Judge version.** `judge_version()` hashes what shapes a prompt: the
+format number, model, effort, system prompt, facts lines, `frame.md`, the
+question templates and the cheat list's entries. Editing a cheat entry
+changes it, which re-asks every cached question and needs a new
+calibration; editing the list's prose doesn't. The grader's own version
+isn't part of it.
+
+**Calibration gate.** `-Calibrate` asks every item labeled in the cases'
+`grading/corpus/judge.toml` files 5 times (fewer is never recorded), one
+call at a time. It passes only when every answer equals its label
+(`unsure` is a miss). A full pass is written to
+`rubrics/script-fix/judge/calibration.json` (counts and cost only, no
+quotes). Judging asks nothing and exits 1 unless that record matches the
+current judge version and items. The run stops at `-MaxTotalUsd` ($6 by
+default).
+
+**Measured (grader-01e, 2026-11-01).** A full calibration is 145 calls in
+about an hour and costs about $1.10 (under a cent a call on average, though
+a first call is about $0.03). Judging Eval 01's runs 10 and 12 was 6 calls,
+$0.10. A call that fails with `claude exited 1:` and nothing after it is
+usually the account's usage limit: calibrate again once it resets.
+
+**Keep the deduction's caveat in `frame.md`.** Without the sentence saying
+the same-element deduction doesn't make a locator specific, the judge
+answered `ok` 3 times in 5 for a pattern that matches any name. Its
+reasoning: the script passed, so the locator matched one element. The
+`broad-pattern` question caught that fix anyway, but the `retargeted` item
+missed calibration.
 
 ## Rules the rubric doesn't spell out
 
@@ -136,8 +215,8 @@ tags are recorded only on `pending-judge`.
   whose removal gives the reference's steps. A blocked path step retargeted
   in place, or a blocked assertion not kept exactly, is one zero
   `retargeted`.
-- **Report:** `pending-judge` trials are left out of passes/valid until the
-  judge decides them.
+- **Report:** `pending-judge` and `needs-review` trials are left out of
+  passes/valid until the judge (or the CD's review) decides them.
 
 ## Extending it
 
@@ -165,6 +244,9 @@ tags are recorded only on `pending-judge`.
     get the full set, Eval 01 (hand-made) the structural checks only.
     Check 11 (escalate cases only): the input is its reference plus exactly
     one step.
+- **A new judge item:** a corpus file plus a matching `[[item]]` in the
+  case's `grading/corpus/judge.toml` (the label test checks they match).
+  Then `.\30-grade-trials.ps1 -Calibrate`, since the items' hash changed.
 - **A new detector or step kind:**
   - Extend the tables in `steps.py` or the collectors in `detect.py`.
   - Add a corpus file that shows it.
@@ -197,5 +279,8 @@ tags are recorded only on `pending-judge`.
 | `stats.py` | `lower_bound` |
 | `record.py` | fix hashes, `fixes/`, `trials.jsonl` |
 | `grade.py` | the verdict pipeline |
+| `judgeprompt.py` | the judge's questions, prompts, version and `claude -p` call |
+| `calibrate.py` | asking the labeled corpus items; the calibration record and gate |
+| `judge.py` | deciding `pending-judge` trials: reviews, cache, calls, verdicts |
 | `report.py` | the pass-rate report |
 | `__main__.py` | the CLI |

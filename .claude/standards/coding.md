@@ -47,7 +47,10 @@ Python/Playwright fixtures, pwsh repo scripts.
 - **List parameters under `pwsh -File`:** `-Case a,b` reaches a
   `[string[]]` parameter as the one string `"a,b"` (an interactive call
   passes an array), so a script that takes a list splits on commas itself
-  (`30-grade-trials.ps1`). Test both call forms.
+  (`30-grade-trials.ps1`). Test both call forms. The reverse also bites: a
+  `[string]` parameter rejects an in-session `-Runs 10,12` ("Cannot convert
+  value to type System.String"), so declare a list-like parameter
+  `[string[]]` and join it with commas.
 - **Exit-code contracts:** under `pwsh -File`, an uncaught `throw` exits 1.
   A script whose codes carry meaning (1 = hit, 2 = usage) catches its own
   errors and calls `exit <n>`, even for unknown arguments

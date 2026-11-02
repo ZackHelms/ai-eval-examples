@@ -2,10 +2,12 @@
 
 <#
 .SYNOPSIS
-    Grade saved trials of a script-fix case, or report pass rates per subject.
+    Grade saved trials of a script-fix case and judge them, calibrate the
+    judge, or report pass rates per subject.
 
 .DESCRIPTION
-    Wraps `python -m scriptfix grade|report` from the repo's venv.
+    Wraps `python -m scriptfix grade|judge|calibrate|report` from the repo's
+    venv.
 
     Grade mode (-Case and -Runs) grades the saved trial runs of one script-fix
     case under rubric script-fix-v0: transcript validity, fair play, static
@@ -15,22 +17,45 @@
     the case's target; Eval 01's replays open headed browser windows. Exits 1
     when a control replay failed and 2 on usage errors.
 
+    When grading succeeds, grade mode then judges the case's pending-judge
+    trials (what -Judge does), so a run is graded and judged in one go.
+    Judging asks the LLM judge questions about the fixes that the static checks
+    can't settle; each is a paid Sonnet call (see Judge mode). Pass -NoJudge to
+    grade only and judge later with -Judge. The script exits with grade's code
+    when that is non-zero, else with judge's.
+
+    Judge mode (-Judge, one -Case, optional -Runs) judges only: no grading and
+    no replays. Without -Runs it judges every pending-judge or needs-review
+    run. Each question is answered from the case's grading\reviews.toml, else
+    its grading\judge.jsonl cache, else one `claude -p` call. The call is a
+    paid Sonnet call capped at $0.10; a re-run resumes from the cache. With
+    -DryRun it lists the questions and asks nothing, writes nothing.
+
+    Calibrate mode (-Calibrate) asks the judge every labeled corpus item
+    (145 calls with the defaults) and records a full pass in the judge's
+    calibration.json, which judging requires. Each call is a paid Sonnet call
+    capped at $0.10, and a calibration run stops at $6 total by default
+    (-MaxTotalUsd). With -DryRun it prints the call count and asks nothing.
+    Takes no -Case or -Runs.
+
     Report mode (-Report) prints, per case and subject, passes/valid, rate, the
     95% lower bound, pending and invalid counts and the most common tags. With
     no -Case it covers every eval that has a grading\trials.jsonl.
 
     Optional options are passed through only when given, so the Python CLI's
     defaults stay the single source of truth (see: .venv\Scripts\python.exe
-    -m scriptfix grade -h). Run the script; don't dot-source it (it exits
-    with the Python exit code). Needs the venv from .\01-setup-env.ps1.
+    -m scriptfix grade -h, judge -h, calibrate -h). Run the script; don't
+    dot-source it (it exits with the Python exit code). Needs the venv from
+    .\01-setup-env.ps1.
 
 .PARAMETER Case
-    The eval directory, e.g. evals\01-playwright-python-basic. Grade mode takes
-    exactly one; with -Report it may be repeated (comma-separated) to limit
-    the report. A relative path resolves against your current folder.
+    The eval directory, e.g. evals\01-playwright-python-basic. Grade mode and
+    -Judge take exactly one; with -Report it may be repeated (comma-separated)
+    to limit the report. A relative path resolves against your current folder.
 
 .PARAMETER Runs
-    Runs to grade: 1-12 or 1,3,5-7. Required in grade mode.
+    Runs to grade: 1-12 or 1,3,5-7. Required in grade mode; optional with
+    -Judge (default: every pending-judge or needs-review run).
 
 .PARAMETER TrialsRoot
     Folder holding the <NN>-run<N>\ trial folders (Python default applies).
@@ -54,6 +79,38 @@
 .PARAMETER Report
     Print pass rates instead of grading.
 
+.PARAMETER Judge
+    Judge the case's trials only, without grading or replaying (needs exactly
+    one -Case; -Runs is optional). Paid Sonnet calls, $0.10 cap each.
+
+.PARAMETER NoJudge
+    In grade mode, skip the judging that normally follows a successful grade.
+
+.PARAMETER Calibrate
+    Ask the judge every labeled corpus item and record a full pass. Paid
+    Sonnet calls: $0.10 cap each, $6 per run by default. Takes no -Case or
+    -Runs.
+
+.PARAMETER DryRun
+    With -Judge or -Calibrate, list what would be asked and ask nothing.
+
+.PARAMETER Samples
+    With -Calibrate, times to ask each item (Python default applies; fewer
+    than the default is never recorded).
+
+.PARAMETER Items
+    With -Calibrate, ask only these item ids (comma-separated); the result is
+    never recorded.
+
+.PARAMETER MaxTotalUsd
+    With -Calibrate, stop once the running cost passes this many dollars
+    (Python default applies).
+
+.PARAMETER Claude
+    The claude executable that judging and calibrating ask (Python default
+    applies: claude on PATH). A relative path resolves against your current
+    folder.
+
 .PARAMETER Help
     Print this usage and exit. Also: -h, --help, or pwsh's native -?.
 
@@ -69,13 +126,21 @@
     Grade runs 1 and 2, recording them under the interactive tool profile.
 
 .EXAMPLE
+    .\30-grade-trials.ps1 -Judge -DryRun -Case evals\01-playwright-python-basic -Runs 10,12
+    List the judge's questions for runs 10 and 12 without asking any.
+
+.EXAMPLE
+    .\30-grade-trials.ps1 -Calibrate -DryRun
+    Print how many calls a full calibration would make, without making any.
+
+.EXAMPLE
     .\30-grade-trials.ps1 -Report
     Print pass rates for every case that has recorded trials.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [string[]]$Case,
-    [string]$Runs,
+    [string[]]$Runs,
     [string]$TrialsRoot,
     [string]$ProjectsRoot,
     [string]$Effort,
@@ -83,6 +148,14 @@ param(
     [string]$Tools,
     [int]$Timeout,
     [switch]$Report,
+    [switch]$Judge,
+    [switch]$NoJudge,
+    [switch]$Calibrate,
+    [switch]$DryRun,
+    [int]$Samples,
+    [string[]]$Items,
+    [double]$MaxTotalUsd,
+    [string]$Claude,
     [Alias('h')]
     [switch]$Help,
     [Parameter(ValueFromRemainingArguments, DontShow)]
@@ -105,7 +178,28 @@ function Stop-Usage([string]$Message) {
 if ($UnknownArgs) { Stop-Usage "Unknown argument(s): $UnknownArgs." }
 # `pwsh -File` hands a comma list over as one string, so split it here.
 if ($Case) { $Case = @($Case -split ',' | Where-Object { $_ }) }
-if (-not $Report) {
+if ($Items) { $Items = @($Items -split ',' | Where-Object { $_ }) }
+# In a session `-Runs 10,12` is an array; under `pwsh -File` it is one string.
+$runsText = $Runs -join ','
+
+# The mode is whichever of -Report, -Judge and -Calibrate is given; none means
+# grade mode. $PSBoundParameters is read here because the work block below
+# has its own.
+$samplesGiven = $PSBoundParameters.ContainsKey('Samples')
+$maxTotalUsdGiven = $PSBoundParameters.ContainsKey('MaxTotalUsd')
+$timeoutGiven = $PSBoundParameters.ContainsKey('Timeout')
+$modes = @(@($Report, $Judge, $Calibrate) | Where-Object { $_ })
+if ($modes.Count -gt 1) { Stop-Usage "Use only one of -Report, -Judge and -Calibrate." }
+$gradeMode = $modes.Count -eq 0
+if ($NoJudge -and -not $gradeMode) { Stop-Usage "-NoJudge only applies to grade mode (-Case and -Runs)." }
+if (($samplesGiven -or $Items -or $maxTotalUsdGiven) -and -not $Calibrate) {
+    Stop-Usage "-Samples, -Items and -MaxTotalUsd need -Calibrate."
+}
+if ($DryRun -and -not ($Judge -or $Calibrate)) { Stop-Usage "-DryRun needs -Judge or -Calibrate." }
+if ($Calibrate -and ($Case -or $Runs)) { Stop-Usage "-Calibrate takes no -Case or -Runs." }
+if ($Judge -and -not $Case) { Stop-Usage "Missing -Case (the eval directory to judge)." }
+if ($Judge -and $Case.Count -ne 1) { Stop-Usage "-Judge takes exactly one -Case (got $($Case.Count))." }
+if ($gradeMode) {
     if (-not $Case) { Stop-Usage "Missing -Case (the eval directory to grade)." }
     if ($Case.Count -ne 1) { Stop-Usage "Grade mode takes exactly one -Case (got $($Case.Count))." }
     if (-not $Runs) { Stop-Usage "Missing -Runs (e.g. 3-12 or 1,3,5-7)." }
@@ -125,12 +219,14 @@ $trialsRootDir = $null
 if ($TrialsRoot) { $trialsRootDir = [IO.Path]::GetFullPath($TrialsRoot, $PWD.Path) }
 $projectsRootDir = $null
 if ($ProjectsRoot) { $projectsRootDir = [IO.Path]::GetFullPath($ProjectsRoot, $PWD.Path) }
+$claudePath = $null
+if ($Claude) { $claudePath = [IO.Path]::GetFullPath($Claude, $PWD.Path) }
 
 # The work runs in a child scope so StrictMode, $ErrorActionPreference and the
 # helper variables don't leak into your session. Python's exit code lands in
 # $script:exitCode (the block's own output is not captured, so Python's isn't).
-# $PSBoundParameters inside the block is the block's own, so capture it here.
-$timeoutGiven = $PSBoundParameters.ContainsKey('Timeout')
+# $PSBoundParameters inside the block is the block's own, so the facts it needs
+# were captured above.
 $script:exitCode = 0
 & {
     Set-StrictMode -Version Latest
@@ -144,20 +240,42 @@ $script:exitCode = 0
         return
     }
 
-    $pyArgs = @('-m', 'scriptfix', ($Report ? 'report' : 'grade'))
+    $subcommand = $Report ? 'report' : $Judge ? 'judge' : $Calibrate ? 'calibrate' : 'grade'
+    $pyArgs = @('-m', 'scriptfix', $subcommand)
     foreach ($c in $caseDirs) { $pyArgs += @('--case', $c) }
-    if (-not $Report) { $pyArgs += @('--runs', $Runs) }
-    $optional = @(
-        @('--trials-root',   $trialsRootDir),
-        @('--projects-root', $projectsRootDir),
-        @('--effort',        $Effort),
-        @('--context',       $Context),
-        @('--tools',         $Tools)
-    )
+    # Options in the order given; an empty value means "not given".
+    $optional = @()
+    if ($gradeMode -or ($Judge -and $runsText)) { $optional += , @('--runs', $runsText) }
+    # Options a mode doesn't take are left for Python to reject (exit 2).
+    if (-not $Calibrate) {
+        $optional += , @('--trials-root',   $trialsRootDir)
+        $optional += , @('--projects-root', $projectsRootDir)
+    }
+    if (-not $Judge -and -not $Calibrate) {
+        $optional += , @('--effort',  $Effort)
+        $optional += , @('--context', $Context)
+        $optional += , @('--tools',   $Tools)
+    }
+    if ($Judge -or $Calibrate) { $optional += , @('--claude', $claudePath) }
     foreach ($option in $optional) {
         if ($option[1]) { $pyArgs += @($option[0], $option[1]) }
     }
-    if ($timeoutGiven) { $pyArgs += @('--timeout', "$Timeout") }
+    if ($timeoutGiven -and -not $Judge -and -not $Calibrate) { $pyArgs += @('--timeout', "$Timeout") }
+    if ($Calibrate) {
+        if ($samplesGiven) { $pyArgs += @('--samples', "$Samples") }
+        foreach ($item in $Items) { $pyArgs += @('--items', $item) }
+        if ($maxTotalUsdGiven) { $pyArgs += @('--max-total-usd', $MaxTotalUsd.ToString([cultureinfo]::InvariantCulture)) }
+    }
+    if ($DryRun) { $pyArgs += '--dry-run' }
+
+    # Grade mode judges what it just graded, the same way `-Judge` would.
+    $judgeArgs = $null
+    if ($gradeMode -and -not $NoJudge) {
+        $judgeArgs = @('-m', 'scriptfix', 'judge', '--case', $caseDirs[0], '--runs', $runsText)
+        if ($trialsRootDir)  { $judgeArgs += @('--trials-root', $trialsRootDir) }
+        if ($projectsRootDir) { $judgeArgs += @('--projects-root', $projectsRootDir) }
+        if ($claudePath)      { $judgeArgs += @('--claude', $claudePath) }
+    }
 
     # `python -m scriptfix` needs tools\ on the path; restore the caller's value
     # afterwards because env changes are process-wide.
@@ -167,6 +285,10 @@ $script:exitCode = 0
         $env:PYTHONPATH = Join-Path $repoRoot 'tools'
         & $venvPython @pyArgs
         $script:exitCode = $LASTEXITCODE
+        if ($script:exitCode -eq 0 -and $judgeArgs) {
+            & $venvPython @judgeArgs
+            $script:exitCode = $LASTEXITCODE
+        }
     } finally {
         Pop-Location
         $env:PYTHONPATH = $previousPythonPath

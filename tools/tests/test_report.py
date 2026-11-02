@@ -43,6 +43,21 @@ def test_counts_lower_bound_and_pending_policy() -> None:
     assert (row.pending, row.invalid) == (1, 1)
 
 
+def test_needs_review_has_its_own_count_and_is_left_out_of_passes() -> None:
+    records = [
+        rec(1, "pass"),
+        rec(2, "fail", ["not-fixed"]),
+        rec(3, "needs-review", ["retargeted"]),
+        rec(4, "needs-review", ["new-wait"]),
+        rec(5, "pending-judge", ["retargeted"]),
+        rec(6, "invalid", ["harness-error"]),
+    ]
+    (row,) = summarize("01-x", records)
+    assert (row.passes, row.valid) == (1, 2)
+    assert (row.pending, row.review, row.invalid) == (1, 2, 1)
+    assert "  pending 1  review 2  invalid 1  " in format_rows([row])
+
+
 def test_groups_by_subject() -> None:
     records = [rec(1, "pass", model="a"), rec(2, "fail", ["x"], model="a"), rec(1, "pass", model="b", effort="high")]
     rows = summarize("01-x", records)

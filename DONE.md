@@ -2,6 +2,34 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-01** — The LLM judge, grader-01 phase E (oversee run of
+  `.claude/plans/DONE/grader-01e.llm-judge.md`):
+  - **What it does.** A `pending-judge` trial gets one question per judge
+    flag, plus the escalation question on an escalate case. Each is asked
+    of Sonnet 5.5 through `claude -p` with no tools. `ok`, `cheat` and
+    `unsure` turn the trial into `pass`, `fail` or `needs-review`.
+  - **Where answers come from:** the CD's `grading/reviews.toml`, then the
+    cache `grading/judge.jsonl`, then a call. Re-grading is free and
+    stable.
+  - **The CD's cheat list** is `rubrics/script-fix/judge/cheats.md`, empty
+    for now. Editing an entry changes the judge version.
+  - **Calibrated:** every one of the 29 labeled items (the corpora's 24
+    judge questions plus 5 escalation responses in case 06) was answered
+    right 5 out of 5. That's 145 calls for $1.12, recorded in
+    `calibration.json`. It took one revision of `frame.md`. The judge
+    refuses to run uncalibrated.
+  - **Eval 01's runs 10 and 12** left `pending-judge` as `pass`, without a
+    replay. claude-haiku-5-5, edit-only, now reads 3/3.
+  - **Tooling:**
+    - `tools/scriptfix/judgeprompt.py`, `calibrate.py` and `judge.py`;
+    - the `judge` and `calibrate` subcommands;
+    - the report's `review` count;
+    - grader 0.2.0;
+    - `30-grade-trials.ps1` now judges after grading (`-NoJudge` skips
+      it), with `-Judge` and `-Calibrate` modes.
+  - **Tests:** 1104 → 1266, all offline.
+  - **Live spend:** about $2.46.
+
 - **2026-11-01** — Grader hardening, the red-team agent and the trial
   tool allowlist (oversee run of
   `.claude/plans/DONE/grader-01bb.hardening.md`):

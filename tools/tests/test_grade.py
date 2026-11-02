@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 
+import scriptfix
 from scriptfix.grade import GradeResult, grade, locate_trial, mangle_path
 from scriptfix.record import fix_hash, read_trials, write_trials
 from scriptfix.replay import ReplayResult
@@ -392,7 +393,7 @@ def test_pass_records_info_and_smell_tags(tmp_path: Path) -> None:
     (rec,) = world.records()
     assert rec["judge"] == [] and rec["cost_usd"] == 0.25 and rec["session"] == "sess-1"
     assert rec["subject"] == {"model": "model-a", "effort": "default", "context": "none", "tools": "edit-only", "cli": "9.9.9"}
-    assert (rec["date"], rec["grader"], rec["rubric"], rec["run"]) == ("2026-10-31", "0.1.0", "script-fix-v0", 1)
+    assert (rec["date"], rec["grader"], rec["rubric"], rec["run"]) == ("2026-10-31", scriptfix.__version__, "script-fix-v0", 1)
     assert rec["replay"] == {"exit_code": 0, "failing_line": None, "timed_out": False}
 
 

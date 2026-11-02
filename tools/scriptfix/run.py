@@ -191,6 +191,15 @@ def stripped_names(environ: Mapping[str, str]) -> list[str]:
     return sorted(key for key in environ if _is_stripped(key))
 
 
+def session_free_env(environ: Mapping[str, str]) -> dict[str, str]:
+    """A copy of ``environ`` without the parent session's variables (``_is_stripped``).
+
+    ``PATH`` and everything else stay. ``trial_env`` starts from this; the
+    judge's ``claude -p`` call uses it as it is.
+    """
+    return {key: value for key, value in environ.items() if not _is_stripped(key)}
+
+
 def _norm(path: str | os.PathLike[str]) -> str:
     return os.path.normcase(os.path.abspath(path))
 
@@ -211,12 +220,12 @@ def trial_env(environ: Mapping[str, str], *, pwsh_dir: Path, repo_root: Path) ->
     ``pwsh`` alias ("The command line is too long"); only the ``PATH`` change
     does.
     """
-    env = dict(environ)
-    venv = next((value for key, value in env.items() if key.upper() == "VIRTUAL_ENV"), "")
-    path_key = next((key for key in env if key.upper() == "PATH"), "PATH")
-    old_path = next((value for key, value in env.items() if key.upper() == "PATH"), "")
+    venv = next((value for key, value in environ.items() if key.upper() == "VIRTUAL_ENV"), "")
+    path_key = next((key for key in environ if key.upper() == "PATH"), "PATH")
+    old_path = next((value for key, value in environ.items() if key.upper() == "PATH"), "")
 
-    for key in [key for key in env if _is_stripped(key) or key.upper() == "PATH"]:
+    env = session_free_env(environ)
+    for key in [key for key in env if key.upper() == "PATH"]:
         del env[key]
 
     avoid = [_norm(repo_root)]

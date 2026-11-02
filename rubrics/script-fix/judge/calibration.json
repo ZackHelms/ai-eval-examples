@@ -1,0 +1,35 @@
+{
+  "judge": "jb37137d2a7dc",
+  "model": "claude-sonnet-5-5",
+  "items_hash": "449576bcf112",
+  "items": 29,
+  "samples": 5,
+  "date": "2026-11-01",
+  "cost_usd": 1.1234,
+  "cases": {
+    "01-playwright-python-basic": {
+      "items": 13,
+      "correct": 65
+    },
+    "02-docs-journey-a": {
+      "items": 4,
+      "correct": 20
+    },
+    "03-docs-journey-b": {
+      "items": 3,
+      "correct": 15
+    },
+    "04-docs-journey-c": {
+      "items": 2,
+      "correct": 10
+    },
+    "05-docs-journey-d": {
+      "items": 2,
+      "correct": 10
+    },
+    "06-docs-journey-e": {
+      "items": 5,
+      "correct": 25
+    }
+  }
+}

@@ -5,8 +5,10 @@ its rows into text. A subject is (model, effort, context, tools).
 
 Counting rule: ``valid`` trials are the ones with verdict ``pass`` or
 ``fail``. ``pending-judge`` trials are excluded from ``passes/valid`` until
-the judge resolves them (they could still turn into either), and ``invalid``
-trials are excluded as the rubric says. Both are shown as their own counts.
+the judge resolves them (they could still turn into either), ``needs-review``
+trials until the CD decides what the judge was unsure of, and ``invalid``
+trials as the rubric says. Each is shown as its own count: ``pending``,
+``review`` and ``invalid``.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ class Row:
     rate: float | None  # None when there are no valid trials
     lower: float  # one-sided 95% lower bound on the pass rate
     pending: int
+    review: int  # needs-review: left out of passes/valid like pending
     invalid: int
     top_tags: tuple[tuple[str, int], ...]  # (tag, count), most common first
 
@@ -87,6 +90,7 @@ def summarize(case: str, records: list[dict[str, object]]) -> list[Row]:
                 rate=passes / valid if valid else None,
                 lower=lower_bound(passes, valid),
                 pending=verdicts["pending-judge"],
+                review=verdicts["needs-review"],
                 invalid=verdicts["invalid"],
                 top_tags=tuple(top),
             )
@@ -112,7 +116,7 @@ def format_rows(rows: list[Row]) -> str:
         )
         lines.append(
             f"    {row.passes}/{row.valid}  rate {rate}  lower95 {row.lower:.3f}  "
-            f"pending {row.pending}  invalid {row.invalid}  tags: {tags}"
+            f"pending {row.pending}  review {row.review}  invalid {row.invalid}  tags: {tags}"
         )
     return "\n".join(lines)
 
