@@ -85,6 +85,15 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
 
 ## Next
 
+- **Record the Playwright API pins** (the CD, *Decided 2026-11-04*,
+  DONE.md): every eval script uses the async API and runs Playwright's
+  bundled Chromium, with no browser channel. Changing either takes a
+  superseding ADR. That's what every script does today, so nothing
+  changes but the docs. ADR-0002 left both open, so write a short
+  ADR-0003, then resolve the two markers it settles:
+  `.claude/standards/coding.md` § Platform pins (the API-pins bullet) and
+  `.claude/standards/review.md` item 3. Docs-only and small:
+  `/zmh-producer:backlog-plan-gen API pins`, or one sitting.
 - **Grader: follow helpers at their call sites** (the two red-team misses
   grader-01bc left, `zero-uncalled-def` and `zero-if-around-helper`;
   `.claude/plans/DONE/grader-01bc.hardening-round-2.follow-up.md`). The
@@ -124,15 +133,17 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   - [x] `.claude/zmh/producer.md` — Environment setup quirks (worktree
         venv bootstrap; refine pass after grader-01b)
   - [ ] `.claude/standards/coding.md` — Python version done (ADR-0002);
-        open: lint/type pin and the remaining Playwright API pins (sync vs
-        async, browser channel; waits + transaction timers done)
+        the Playwright API pins are decided (async, bundled Chromium; the
+        § Next item records them; waits + transaction timers done); open:
+        the lint/type pin
   - [x] `.claude/standards/architecture.md` — shared-tooling location
         (ADR-0001); learnings seeded (they keep growing)
   - [x] `.claude/standards/naming.md` — eval slug numeric prefix
         (ADR-0001)
   - [x] `.claude/standards/testing.md` — test/check runner; test directory (grader-01b)
-  - [ ] `.claude/standards/review.md` — static-reviewer API pins (the
-        version half is done: ADR-0002)
+  - [ ] `.claude/standards/review.md` — static-reviewer API pins, decided
+        and recorded by the § Next item (the version half is done:
+        ADR-0002)
   - [ ] `.claude/agents/README.md` — anticipated agents (the specialist
         table is done: `eval-static-reviewer`, grader-01c)
   - [ ] `.claude/checklists/README.md` — per-workflow checklists (as
@@ -150,6 +161,25 @@ and closed in its last commit (CLAUDE.md § In-progress SOP).
   trial run did neither). Unblocked (Eval 01 is complete); it stays in
   Later behind the phase F pilot, whose numbers it would be compared
   against.
+- **Grader residue** (the open follow-ups of grader-01bb and grader-01bc,
+  `.claude/plans/DONE/grader-01bc.hardening-round-2.follow-up.md`
+  § Deferred). None is urgent; the pilot's real trials will show which
+  shapes models actually produce:
+  - a `route` that fulfills a fake page stays `changed-setup` (judge); if
+    a pilot trial does it, consider `changed-page`;
+  - regrade from `fixes/` when a trial folder is gone;
+  - compare a fix's sleep, wait or `slow_mo` values with the
+    reference's, not just their counts;
+  - fix cases' later assertions after a path divergence go uncompared
+    (tags only);
+  - an escalate retarget moved to another gap with another matcher stays
+    `added-assertion`;
+  - the replay's POSIX kill path is untested off Windows;
+  - red-teaming case 06 needs the CD's approval (the one approved pass
+    was on Eval 01);
+  - cosmetic: a fix that both reorders steps and patches a method lists
+    `changed-journey` twice; fold `_getattr_callee_name` into
+    `ModuleFacts.getattr_name` if a third caller appears.
 
 <!-- --- -->
 

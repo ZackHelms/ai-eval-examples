@@ -2,6 +2,12 @@
 
 Append-only, newest first (see `.claude/standards/documentation.md`).
 
+- **2026-11-04** — The Playwright API pins, decided by the CD in backlog
+  refinement: every eval script uses the async API and runs Playwright's
+  bundled Chromium, with no browser channel, as every script already
+  does. Changing either takes a superseding ADR. Recording them (ADR-0003
+  plus the `coding.md` and `review.md` markers) is a TODO.md § Next item.
+
 - **2026-11-02** — The level-set ADR (oversee run of
   `.claude/plans/DONE/levelset-01.adr.md`): `.claude/adr/0002-stack-pins.md`
   records the stack the evals were built on. That's Python 3.12 in `.venv\`,
